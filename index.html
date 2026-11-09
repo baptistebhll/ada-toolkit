@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADA Toolkit</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn" id="menu" title="Menu">☰ Menu</button>
+    <div class="brand" title="Accueil">ADA<span>toolkit</span></div>
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" autocomplete="off" spellcheck="false" autofocus
+             placeholder="Une fonction, un mot-clé ou une phrase… ex. « comparer deux groupes », groupby, p-value">
+      <kbd>/</kbd>
+    </div>
+    <div class="filters">
+      <div class="seg" id="src" title="Quels notebooks utiliser">
+        <button data-v="all">Tout</button>
+        <button data-v="ref">Solutions &amp; cours</button>
+        <button data-v="mine">Mes exos</button>
+      </div>
+      <select id="chap" title="Chapitre"></select>
+      <button class="icon-btn" id="theme" title="Changer de thème">◐</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside id="side"></aside>
+    <main id="main"></main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="kb_functions.js"></script>
+  <script src="kb_recipes.js"></script>
+  <script src="search.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
