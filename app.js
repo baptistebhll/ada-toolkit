@@ -65,6 +65,7 @@
     chap: store.get("chap", "all"),
     open: store.get("open2", {}),
     tab: store.get("tab", "recettes"),
+    train: store.get("train", false), // mode entraînement : tout ce qui vient des séries est masqué
     route: { type: "home" },
     sel: 0,
     toc: [],
@@ -129,6 +130,7 @@
   const chapters = [...new Set(D.notebooks.map((n) => n.chapter))].sort();
 
   function cellVisible(c) {
+    if (state.train) return false;
     const nb = D.notebooks[c.nb];
     if (state.chap !== "all" && nb.chapter !== state.chap) return false;
     if (state.src === "ref" && nb.kind === "exercice") return false;
@@ -151,7 +153,8 @@
   function runSearch(q) {
     const nq = norm(q).replace(/[()]/g, "").trim();
     return S.search(IX, q, {
-      accept: (d) => d.type !== "cell" || cellVisible(d.ref),
+      // en mode entraînement : ni cellules des séries, ni fonctions qui n'existent que via les séries
+      accept: (d) => (d.type === "cell" ? cellVisible(d.ref) : !(state.train && d.type === "fn" && !d.ref.kb)),
       prior: (d) => (d.type === "recipe" ? 1.25 : d.type === "fn" ? (d.ref.kb ? 1.15 : 0.85) : 0.7),
       exact: (d) => d.type === "fn" && [d.ref.display, d.ref.short, d.ref.key].some((x) => norm(x) === nq),
     });
@@ -358,7 +361,7 @@
         `<a class="nbchip" href="${nbHref(i)}"><span class="kind k-${n.kind}">${KIND_LABEL[n.kind]}</span>${esc(n.title)}</a>`).join("")}</div>`).join("");
     return `<div class="home">
       <h1>Ton antisèche d'analyse de données</h1>
-      <p class="sub">${plural(RECIPES.length, "recette")} · ${plural(FNS.filter((f) => f.kb).length, "fiche")} de fonctions · ${D.notebooks.length} notebooks du cours (${D.cells.length} cellules) — tout est cherchable.</p>
+      <p class="sub">${plural(RECIPES.length, "recette")} · ${plural(FNS.filter((f) => f.kb).length, "fiche")} de fonctions${state.train ? "" : ` · ${D.notebooks.length} notebooks du cours (${D.cells.length} cellules)`} — tout est cherchable.</p>
       <div class="keys"><span><kbd>/</kbd> chercher</span><span><kbd>↑</kbd> <kbd>↓</kbd> choisir</span><span><kbd>Entrée</kbd> ouvrir</span><span><kbd>Échap</kbd> effacer</span></div>
       <h2 class="sec">Essaie une phrase ou un mot-clé</h2>
       <div class="chips">${EXAMPLES.map((t) => `<button class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join("")}</div>
@@ -366,8 +369,7 @@
       <div class="pipeline">${pipeline}</div>
       <h2 class="sec">Librairies</h2>
       <div class="libgrid">${libs}</div>
-      <h2 class="sec">Cours & solutions</h2>
-      <div class="nblist">${nbs}</div>
+      ${state.train ? "" : `<h2 class="sec">Cours & solutions</h2><div class="nblist">${nbs}</div>`}
     </div>`;
   }
 
@@ -447,10 +449,10 @@
         <div class="crumbs"><span class="lib-dot" style="--c:${libColor(f.lib)}"></span><a href="${libHref(f.lib)}">${esc(libLabel(f.lib))}</a>${f.cat ? ` › ${esc(f.cat)}` : ""}</div>
         <h1><code>${esc(f.display)}</code></h1>
         <div class="full">${esc(fullName)}</div>
-        ${f.desc ? `<p class="desc">${esc(f.desc)}</p>` : `<p class="desc muted">Pas encore de fiche détaillée pour cette fonction — exemples tirés de tes notebooks ci-dessous.</p>`}
+        ${f.desc ? `<p class="desc">${esc(f.desc)}</p>` : `<p class="desc muted">Pas encore de fiche détaillée pour cette fonction${state.train ? "." : " — exemples tirés de tes notebooks ci-dessous."}</p>`}
         <div class="meta">
-          ${f.count ? `<span>${plural(f.count, "utilisation")} dans tes notebooks</span>` : `<span>Pas utilisée dans tes notebooks</span>`}
-          ${chaps.map((c) => `<span class="tag">ch. ${esc(c)}</span>`).join("")}
+          ${state.train ? "" : f.count ? `<span>${plural(f.count, "utilisation")} dans tes notebooks</span>` : `<span>Pas utilisée dans tes notebooks</span>`}
+          ${state.train ? "" : chaps.map((c) => `<span class="tag">ch. ${esc(c)}</span>`).join("")}
           ${f.doc ? `<a class="doc" href="${esc(f.doc)}" target="_blank" rel="noopener">Documentation officielle ↗</a>` : ""}
         </div>
       </div>
@@ -458,8 +460,8 @@
       ${f.note ? `<div class="note">💡 ${esc(f.note)}</div>` : ""}
       ${f.ex ? `<h2 class="sec">Exemple général</h2>${codeBlock(f.ex)}` : ""}
       ${recs.length ? `<h2 class="sec">Recettes qui l'utilisent</h2><div class="chips">${recs.map(recChip).join("")}</div>` : ""}
-      <h2 class="sec">Dans tes notebooks <span class="cnt">${groups.length}</span></h2>
-      ${groups.length ? cardsHtml(groups, { fn: f.short }) : noCourse()}
+      ${state.train ? "" : `<h2 class="sec">Dans tes notebooks <span class="cnt">${groups.length}</span></h2>
+      ${groups.length ? cardsHtml(groups, { fn: f.short }) : noCourse()}`}
       ${rel.length ? `<h2 class="sec">Souvent utilisée avec (dans tes notebooks)</h2><div class="chips">${rel.map(([k, n]) => fnChip(k, `<span class="cnt">${n}</span>`)).join("")}</div>` : ""}
       ${sameCat.length ? `<h2 class="sec">Même catégorie : ${esc(f.cat)}</h2><div class="chips">${sameCat.map((g) => fnChip(g.key)).join("")}</div>` : ""}`;
   }
@@ -489,8 +491,8 @@
       <div class="steps">${steps}</div>
       ${r.tips && r.tips.length ? `<div class="note"><b>À retenir</b><ul>${r.tips.map((t) => `<li>${inline(t)}</li>`).join("")}</ul></div>` : ""}
       ${r.keys.length ? `<h2 class="sec">Fonctions utilisées</h2><div class="chips">${r.keys.map((k) => fnChip(k)).join("")}</div>` : ""}
-      <h2 class="sec">Vu dans tes notebooks <span class="cnt">${groups.length}</span></h2>
-      ${groups.length ? cardsHtml(groups, {}, 2) : noCourse()}
+      ${state.train ? "" : `<h2 class="sec">Vu dans tes notebooks <span class="cnt">${groups.length}</span></h2>
+      ${groups.length ? cardsHtml(groups, {}, 2) : noCourse()}`}
       ${same.length ? `<h2 class="sec">Autres recettes : ${esc(r.cat)}</h2><div class="chips">${same.map(recChip).join("")}</div>` : ""}`;
   }
 
@@ -562,17 +564,18 @@
   }
 
   // ================================================================== barre latérale
-  const TABS = [["recettes", "Recettes"], ["libs", "Librairies"], ["nbs", "Notebooks"]];
+  const ALL_TABS = [["recettes", "Recettes"], ["libs", "Librairies"], ["nbs", "Notebooks"]];
   function sideTabFor(route) {
     if (route.type === "recipe" || route.type === "recipes") return "recettes";
     if (route.type === "fn" || route.type === "lib") return "libs";
-    if (route.type === "nb" || route.type === "notebooks") return "nbs";
-    return state.tab;
+    if (route.type === "nb" || route.type === "notebooks") return state.train ? "recettes" : "nbs";
+    return state.train && state.tab === "nbs" ? "recettes" : state.tab;
   }
   const isOpen = (k, dflt) => (k in state.open ? state.open[k] : dflt);
 
   function renderSide() {
     const r = state.route;
+    const TABS = state.train ? ALL_TABS.slice(0, 2) : ALL_TABS;
     const tabs = `<div class="side-tabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${state.tab === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
     let body = "";
     if (state.tab === "recettes") {
@@ -629,14 +632,16 @@
       case "recipe": html = viewRecipe(r.id); title = REC[r.id] ? REC[r.id].title : title; break;
       case "recipes": html = viewRecipes(); title = "Recettes"; break;
       case "lib": html = viewLib(r.lib); title = r.lib; break;
-      case "nb": html = viewNotebook(r.nb); title = D.notebooks[r.nb] ? D.notebooks[r.nb].title : title; break;
-      case "notebooks": html = viewNotebooks(); title = "Notebooks"; break;
-      case "code": html = viewCode(r.text); break;
+      case "nb": html = state.train ? trainBlocked() : viewNotebook(r.nb); title = D.notebooks[r.nb] ? D.notebooks[r.nb].title : title; break;
+      case "notebooks": html = state.train ? trainBlocked() : viewNotebooks(); title = "Notebooks"; break;
+      case "code": html = state.train ? trainBlocked() : viewCode(r.text); break;
       default: html = viewHome();
     }
     document.title = title === "ADA toolkit" ? title : `${title} — ADA toolkit`;
     const prevScroll = main.scrollTop;
-    main.innerHTML = `<div class="main-inner">${html}</div>`;
+    const banner = state.train ? `<div class="train-banner">🎯 <b>Mode entraînement</b> — les séries d'exos (cours, solutions, tes exos) sont masquées.
+      <button class="chip" id="train-off">Réafficher les séries</button></div>` : "";
+    main.innerHTML = `<div class="main-inner">${banner}${html}</div>`;
     main.scrollTop = keepScroll ? prevScroll : 0;
     if (!keepScroll && main.scrollHeight <= main.clientHeight + 1) window.scrollTo(0, 0); // mobile : c'est la page qui défile
     if (r.type === "search" && qInput.value !== r.q && document.activeElement !== qInput) qInput.value = r.q;
@@ -695,6 +700,23 @@
   srcSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setFilters(b.dataset.v, state.chap); });
   chapSel.addEventListener("change", () => setFilters(state.src, chapSel.value));
 
+  // ================================================================== mode entraînement
+  const trainBox = $("#train");
+  function trainBlocked() {
+    return `<div class="empty">Les notebooks des séries sont masqués en mode entraînement.<br>
+      <button class="chip" id="train-off">Réafficher les séries</button></div>`;
+  }
+  function setTrain(on) {
+    state.train = on;
+    store.set("train", on);
+    trainBox.checked = on;
+    document.body.classList.toggle("training", on);
+    render(true);
+  }
+  trainBox.checked = state.train;
+  document.body.classList.toggle("training", state.train);
+  trainBox.addEventListener("change", () => setTrain(trainBox.checked));
+
   // ================================================================== thème
   const savedTheme = store.get("theme", null);
   if (savedTheme) document.documentElement.dataset.theme = savedTheme;
@@ -727,6 +749,7 @@
       scope.querySelectorAll(".more-hidden").forEach((x) => x.classList.remove("more-hidden"));
       el.remove();
     } else if (el.id === "reset-filters") setFilters("all", "all");
+    else if (el.id === "train-off") setTrain(false);
     else if (el.dataset.q !== undefined) setQuery(el.dataset.q);
   });
 
