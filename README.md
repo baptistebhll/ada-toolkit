@@ -9,7 +9,14 @@ notebooks du cours, lecteur de notebooks, et recherche par mot-clé ou par phras
    ```
    python build_index.py
    ```
-2. Ouvrir `index.html` (double-clic) dans Chrome / Edge / Firefox. Pas besoin d'internet ni de serveur.
+2. (Re)générer les résultats des exemples après avoir modifié des fiches ou des recettes
+   (environnement conda `ada` : pandas, seaborn, statsmodels, scikit-learn, networkx) :
+   ```
+   conda run -n ada python run_examples.py
+   ```
+   Chaque exemple est exécuté sur les données fictives de `donnees_exemple.py` ; ses vraies sorties
+   (valeurs, tableaux, graphiques) vont dans `examples.js` et `img/ex/`. Le script liste les exemples en erreur.
+3. Ouvrir `index.html` (double-clic) dans Chrome / Edge / Firefox. Pas besoin d'internet ni de serveur.
 
 Raccourcis : `/` ou `Ctrl+K` pour chercher, `↑` `↓` pour choisir un résultat, `Entrée` pour l'ouvrir, `Échap` pour effacer.
 

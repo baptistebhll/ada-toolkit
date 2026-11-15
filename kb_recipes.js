@@ -26,11 +26,11 @@ print(df.shape); df.info(); df.head()
 df.isna().mean().sort_values(ascending=False)`],
      ["2. Nettoyer : types, dates, doublons, valeurs aberrantes ; noter combien de lignes on enlève.",
 `n0 = len(df)
-df = df.drop_duplicates().dropna(subset=['col_cle'])
+df = df.drop_duplicates().dropna(subset=['revenu'])
 print(f'{n0 - len(df)} lignes supprimées')`],
      ["3. Décrire et visualiser (distribution de chaque variable clé, relations entre variables).",
 `df.describe()
-sns.histplot(data=df, x='variable', log_scale=True)`],
+sns.histplot(data=df, x='revenu', log_scale=True)`],
      ["4. Répondre à la question : comparer des groupes (test), modéliser (régression), prédire (ML) ou corriger un biais (matching).", ""],
      ["5. Quantifier l'incertitude (IC bootstrap, p-values) et conclure en une phrase claire, avec les limites.", ""]],
     ["Toujours un titre, des axes nommés (avec unités) et une échelle log si la distribution est très asymétrique.",
@@ -110,7 +110,7 @@ df['annee'] = df['date'].dt.year
 df['mois'] = df['date'].dt.month
 df['jour_semaine'] = df['date'].dt.dayofweek
 df['pays'] = df['pays'].astype('category')`],
-     ["Timestamps Unix.", `df['date'] = pd.to_datetime(df['ts'], unit='s')`]],
+     ["Timestamps Unix.", `df['date'] = pd.to_datetime(df['timestamp'], unit='s')`]],
     ["errors='coerce' transforme les valeurs invalides en NaN : compter combien ensuite."],
     ["pd.to_numeric", "pd.to_datetime", "s.dt", "df.astype"]);
 
@@ -163,11 +163,12 @@ smf.ols("revenu ~ C(pays, Treatment(reference='CH'))", data=df).fit()   # choisi
   R(C, "joindre", "Joindre deux tables",
     "Associer les lignes de deux DataFrames via une clé commune (comme un JOIN SQL).",
     "joindre jointure fusionner combiner relier deux tables merge join cle",
-    [["", `df = pd.merge(clients, achats, on='client_id', how='left')
-df = pd.merge(a, b, left_on='id', right_on='user_id', how='inner')`],
-     ["Vérifier la jointure.", `print(len(clients), len(achats), len(df))
-df = pd.merge(a, b, on='id', how='outer', indicator=True)
-df['_merge'].value_counts()     # left_only / right_only / both`]],
+    [["", `fusion = pd.merge(clients, achats, on='client_id', how='left')
+fusion2 = pd.merge(clients, achats.rename(columns={'client_id': 'id_client'}), left_on='client_id', right_on='id_client', how='inner')
+fusion`],
+     ["Vérifier la jointure.", `print(len(clients), len(achats), len(fusion))
+verif = pd.merge(clients, achats, on='client_id', how='outer', indicator=True)
+verif['_merge'].value_counts()     # left_only / right_only / both`]],
     ["inner : seulement les correspondances ; left : garde tout à gauche ; outer : tout.",
      "Si le nombre de lignes explose : clé dupliquée (validate='one_to_one' pour le détecter)."],
     ["pd.merge", "df.merge"]);
@@ -175,9 +176,10 @@ df['_merge'].value_counts()     # left_only / right_only / both`]],
   R(C, "empiler", "Empiler ou coller des tables",
     "Ajouter des lignes (même colonnes) ou des colonnes (même index).",
     "empiler concatener coller ajouter lignes append concat stack",
-    [["", `df = pd.concat([df_2019, df_2020], ignore_index=True)
-df = pd.concat([df_2019.assign(annee=2019), df_2020.assign(annee=2020)])
-X = pd.concat([X_num, X_cat], axis=1)`]],
+    [["", `df_tout = pd.concat([df2019, df2020], ignore_index=True)
+df_tout = pd.concat([df2019.assign(annee=2019), df2020.assign(annee=2020)])
+X = pd.concat([df[['age']], pd.get_dummies(df['pays'], dtype=int)], axis=1)
+X.head()`]],
     [], ["pd.concat", "df.assign"]);
 
   R(C, "grouper", "Grouper et agréger (statistiques par groupe)",
@@ -195,10 +197,10 @@ res = (df.groupby('pays', as_index=False)
   R(C, "croiser", "Tableau croisé et pivot",
     "Compter les combinaisons de deux variables, ou mettre une variable en colonnes.",
     "tableau croise contingence pivot remodeler large long croiser deux variables",
-    [["", `pd.crosstab(df['traitement'], df['resultat'])
-pd.crosstab(df['traitement'], df['resultat'], normalize='index')
-df.pivot_table(index='pays', columns='annee', values='pib', aggfunc='mean')
-long = pd.melt(large, id_vars='pays', var_name='annee', value_name='pib')`]],
+    [["", `pd.crosstab(df['traitement'], df['guerison'])
+pd.crosstab(df['traitement'], df['guerison'], normalize='index')
+long = pd.melt(large.reset_index(), id_vars='pays', var_name='annee', value_name='pib')
+df.pivot_table(index='pays', columns='annee', values='revenu', aggfunc='mean')`]],
     [], ["pd.crosstab", "df.pivot_table", "pd.melt", "df.pivot"]);
 
   R(C, "temps", "Séries temporelles : agréger par période, moyenne mobile",
@@ -239,8 +241,8 @@ plt.tight_layout()`]],
     "queue lourde heavy tail loi puissance power law log log ccdf asymetrique pareto",
     [["", `sns.ecdfplot(data=df, x='degre', complementary=True, log_scale=(True, True))
 plt.ylabel('P(X ≥ x)')`],
-     ["Histogramme avec bins logarithmiques.", `bins = np.logspace(0, np.log10(df['x'].max()), 40)
-plt.hist(df['x'], bins=bins, density=True); plt.xscale('log'); plt.yscale('log')`]],
+     ["Histogramme avec bins logarithmiques.", `bins = np.logspace(0, np.log10(df['degre'].max()), 40)
+plt.hist(df['degre'], bins=bins, density=True); plt.xscale('log'); plt.yscale('log')`]],
     ["Une CCDF à peu près droite en log-log suggère une loi de puissance ; la moyenne y est peu informative."],
     ["sns.ecdfplot", "plt.loglog", "np.logspace", "plt.xscale"]);
 
@@ -276,7 +278,7 @@ sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', center=0, vmin=-1, vma
     "Ce qui est attendu à l'examen : axes nommés, unités, titre, légende.",
     "graphique propre titre axes legende sous graphiques plusieurs subplots figure presentation",
     [["", `fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-for ax, col in zip(axes.flat, ['a', 'b', 'c', 'd']):
+for ax, col in zip(axes.flat, ['a', 'b', 'c', 'score']):
     sns.histplot(data=df, x=col, ax=ax)
     ax.set(title=f'Distribution de {col}', xlabel=col, ylabel='Effectif')
 plt.suptitle('Titre général')
@@ -296,7 +298,8 @@ plt.show()`]],
     boots = [stat(np.random.choice(x, size=len(x), replace=True)) for _ in range(n_boot)]
     return np.percentile(boots, [100 * alpha / 2, 100 * (1 - alpha / 2)])
 
-bas, haut = bootstrap_ci(df['revenu'], np.median)`],
+ic = bootstrap_ci(df['revenu'], np.median)
+ic`],
      ["Avec scipy.", `res = stats.bootstrap((df['revenu'].values,), np.median, confidence_level=0.95)
 res.confidence_interval`],
      ["Afficher : barres d'erreur.", `plt.errorbar(x=groupes, y=moyennes, yerr=[moyennes - bas, haut - moyennes], fmt='o', capsize=4)`]],
@@ -339,7 +342,7 @@ print(p)`]],
     "normalite loi normale gaussienne exponentielle distribution suit kolmogorov smirnov shapiro qq plot",
     [["", `from statsmodels.stats import diagnostic
 stat, p = diagnostic.kstest_normal(df['x'], dist='norm')    # ou dist='exp'
-stats.shapiro(df['x'].sample(500, random_state=0))
+stats.shapiro(df['x'].sample(100, random_state=0))
 stats.kstest(df['x'], 'norm', args=(df['x'].mean(), df['x'].std()))
 stats.ks_2samp(a, b)     # deux échantillons ont-ils la même distribution ?`],
      ["QQ-plot.", `import statsmodels.api as sm
@@ -431,10 +434,12 @@ df['proba'] = res.predict(df)`]],
   R(C, "diagnostic-regression", "Vérifier une régression (résidus, prédictions)",
     "Résidus, valeurs ajustées, colinéarité.",
     "residus diagnostic verifier regression hypotheses colinearite valeurs ajustees",
-    [["", `plt.scatter(res.fittedvalues, res.resid, alpha=0.3)
+    [["", `res = smf.ols('prix ~ surface + age + C(quartier)', data=df).fit()
+plt.scatter(res.fittedvalues, res.resid, alpha=0.3)
 plt.axhline(0, color='red'); plt.xlabel('Valeurs ajustées'); plt.ylabel('Résidus')
+plt.figure()
 sns.histplot(res.resid)
-df[['x1', 'x2', 'x3']].corr()     # prédicteurs très corrélés → coefficients instables`]],
+df[['surface', 'age', 'revenu']].corr()     # prédicteurs très corrélés → coefficients instables`]],
     ["Un motif dans les résidus (entonnoir, courbe) → transformer y ou ajouter un terme."],
     ["res.resid", "plt.scatter", "df.corr"]);
 
@@ -510,8 +515,11 @@ sns.boxplot(data=df_match, x='traite', y='age')`]],
   R(C, "diff-in-diff", "Différence de différences",
     "Comparer l'évolution avant/après d'un groupe traité à celle d'un groupe contrôle.",
     "difference de differences diff in diff did avant apres evolution traitement politique",
-    [["", `res = smf.ols('y ~ traite * apres', data=df).fit()
-res.params['traite:apres']     # effet estimé`]],
+    [["", `# panel : 100 unités traitées / 100 contrôles, observées avant (0) et après (1)
+panel = pd.DataFrame({'traite': np.repeat([0, 1], 100), 'apres': np.tile(np.repeat([0, 1], 50), 2)})
+panel['y'] = 10 + 2 * panel.traite + panel.apres + 3 * panel.traite * panel.apres + np.random.normal(0, 1, 200)
+res = smf.ols('y ~ traite * apres', data=panel).fit()
+res.params['traite:apres']     # effet estimé (vrai effet : 3)`]],
     ["Hypothèse clé : tendances parallèles sans traitement (vérifier visuellement avant la date)."],
     ["smf.ols"]);
 
@@ -539,17 +547,6 @@ print('AUC', roc_auc_score(y_test, proba))`]],
     ["Comparer à une baseline (prédire toujours la classe majoritaire).",
      "Classes déséquilibrées : l'accuracy est trompeuse → precision, recall, F1, AUC."],
     ["sklearn.model_selection.train_test_split", "sklearn.preprocessing.StandardScaler", "sklearn.pipeline.make_pipeline", "sklearn.linear_model.LogisticRegression", "sklearn.metrics.classification_report", "sklearn.metrics.roc_auc_score"]);
-
-  R(C, "regression-ml", "Prédire une valeur continue (régression ML)",
-    "Entraîner un modèle de régression et mesurer son erreur.",
-    "predire valeur continue regression machine learning erreur mse r2",
-    [["", `from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import mean_squared_error, r2_score
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
-lr = LinearRegression().fit(X_train, y_train)
-y_pred = lr.predict(X_test)
-print('RMSE', np.sqrt(mean_squared_error(y_test, y_pred)), 'R2', r2_score(y_test, y_pred))`]],
-    [], ["sklearn.linear_model.LinearRegression", "sklearn.metrics.mean_squared_error", "sklearn.metrics.r2_score"]);
 
   R(C, "cross-validation", "Validation croisée et choix des hyperparamètres",
     "Évaluer de façon robuste et choisir k, alpha, profondeur… sans toucher au test.",
@@ -587,8 +584,8 @@ plt.xlabel('Taux de faux positifs'); plt.ylabel('Taux de vrais positifs'); plt.l
 for alpha in [0.01, 0.1, 1, 10, 100]:
     s = cross_val_score(Ridge(alpha=alpha), X_train, y_train, cv=5, scoring='neg_mean_squared_error')
     print(alpha, -s.mean())
-lasso = Lasso(alpha=0.1).fit(X_train_s, y_train)
-pd.Series(lasso.coef_, index=X.columns)    # coefficients à 0 = variables écartées`]],
+lasso = make_pipeline(StandardScaler(), Lasso(alpha=0.01)).fit(X_train, y_train)
+pd.Series(lasso[-1].coef_, index=X.columns)    # coefficients à 0 = variables écartées`]],
     ["Standardiser avant de régulariser.", "Train bien meilleur que test → surapprentissage → plus de régularisation / modèle plus simple."],
     ["sklearn.linear_model.Ridge", "sklearn.linear_model.Lasso", "sklearn.model_selection.cross_val_score"]);
 
@@ -614,6 +611,18 @@ for k in [1, 5, 15, 51]:
     ["k petit : surapprentissage ; k grand : sous-apprentissage."],
     ["sklearn.neighbors.KNeighborsClassifier", "sklearn.model_selection.cross_val_score"]);
 
+  R(C, "regression-ml", "Prédire une valeur continue (régression ML)",
+    "Entraîner un modèle de régression et mesurer son erreur.",
+    "predire valeur continue regression machine learning erreur mse r2",
+    [["", `from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.metrics import mean_squared_error, r2_score
+X, y = df[['surface', 'age']], df['prix']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+lr = LinearRegression().fit(X_train, y_train)
+y_pred = lr.predict(X_test)
+print('RMSE', np.sqrt(mean_squared_error(y_test, y_pred)), 'R2', r2_score(y_test, y_pred))`]],
+    [], ["sklearn.linear_model.LinearRegression", "sklearn.metrics.mean_squared_error", "sklearn.metrics.r2_score"]);
+
   // =========================================================================================
   C = "9 · Non supervisé";
   R(C, "kmeans", "Clustering k-means et choix du nombre de clusters",
@@ -629,7 +638,7 @@ for k in range(2, 11):
     silhouettes.append(silhouette_score(X_s, km.labels_))
 plt.plot(range(2, 11), silhouettes, '-o'); plt.xlabel('k'); plt.ylabel('Silhouette')`],
      ["Décrire les clusters.", `df['cluster'] = KMeans(n_clusters=4, n_init=10, random_state=0).fit_predict(X_s)
-df.groupby('cluster')[features].mean()`]],
+df.groupby('cluster')[['age', 'revenu', 'score']].mean()`]],
     ["Standardiser avant (k-means utilise des distances).", "k-means suppose des clusters « ronds » de taille similaire ; sinon DBSCAN."],
     ["sklearn.cluster.KMeans", "sklearn.metrics.silhouette_score", "sklearn.preprocessing.StandardScaler"]);
 
@@ -692,7 +701,7 @@ Counter(' '.join(df['texte']).lower().split()).most_common(20)`]],
   R(C, "graphe", "Construire un graphe et calculer des mesures",
     "Nœuds, arêtes, degrés, centralités, composantes.",
     "graphe reseau network noeuds aretes degre centralite composantes connexes mesures",
-    [["", `G = nx.from_pandas_edgelist(df, source='a', target='b', edge_attr='poids')
+    [["", `G = nx.from_pandas_edgelist(aretes, source='from', target='to', edge_attr='weight')
 print(G.number_of_nodes(), G.number_of_edges(), nx.density(G))
 degres = pd.Series(dict(G.degree()))
 degres.nlargest(10)

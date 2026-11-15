@@ -5,6 +5,7 @@
   const D = window.ADA_DATA;
   const KB = window.ADA_KB || { functions: [], recipes: [] };
   const S = window.AdaSearch;
+  const EX = window.ADA_EX || { fn: {}, rec: {} }; // sorties réelles des exemples (run_examples.py)
   const $ = (s) => document.querySelector(s);
   const main = $("#main"), side = $("#side"), qInput = $("#q");
 
@@ -109,7 +110,7 @@
   KB.functions.forEach((k, idx) => {
     const key = kbKey(k.name);
     const f = FN[key] || (FN[key] = { key, cells: [], count: 0, short: key.split(".").pop() });
-    Object.assign(f, { display: kbDisplay(k.name), lib: k.lib, cat: k.cat, sig: k.sig, desc: k.d, ex: k.ex, tags: k.t || "", note: k.n || "", kb: true, kbIdx: idx });
+    Object.assign(f, { display: kbDisplay(k.name), lib: k.lib, cat: k.cat, sig: k.sig, desc: k.d, ex: k.ex, tags: k.t || "", note: k.n || "", kb: true, kbIdx: idx, exOut: (EX.fn || {})[k.name] || [] });
     if (!f.doc) f.doc = docUrl(key, f.lib, f.short);
   });
   // ordre : fiches dans l'ordre du fichier kb_functions.js, puis les fonctions vues seulement en série
@@ -300,21 +301,26 @@
     }).sort((a, b) => b.score - a.score);
   }
 
-  function outputsHtml(outs) {
+  /** opt.open : déplié ; opt.keepOrder : ordre d'exécution ; opt.label : titre */
+  function outputsHtml(outs, opt = {}) {
     const hasImg = outs.some((o) => o.t === "img");
     const label = [...new Set(outs.map((o) => ({ img: "graphique", html: "tableau", text: "texte", error: "erreur" }[o.t])))].join(" + ");
     const order = { img: 0, html: 1, text: 2, error: 3 };
-    const body = [...outs].sort((a, b) => order[a.t] - order[b.t]).map((o) => {
-      if (o.t === "img") return `<img loading="lazy" src="${esc(o.src)}" alt="Graphique produit par la cellule">`;
+    const list = opt.keepOrder ? outs : [...outs].sort((a, b) => order[a.t] - order[b.t]);
+    const body = list.map((o) => {
+      if (o.t === "img") return `<img loading="lazy" src="${esc(o.src)}" alt="Graphique produit par le code">`;
       if (o.t === "html") return `<div class="out-html">${o.v}</div>`;
       return `<pre class="out-text${o.t === "error" ? " err" : ""}">${esc(o.v)}</pre>`;
     }).join("");
-    return `<details class="out"${hasImg ? " open" : ""}><summary>Sortie · ${label}</summary><div class="out-body">${body}</div></details>`;
+    return `<details class="out"${opt.open || hasImg ? " open" : ""}><summary>${opt.label || "Sortie"} · ${label}</summary><div class="out-body">${body}</div></details>`;
   }
 
   const copyBtn = (code) => `<button class="copy" data-copy="${reg(code)}">Copier</button>`;
-  const codeBlock = (code, title) => `<div class="card code-card">${title ? `<header class="card-head"><span class="crumb">${title}</span>${copyBtn(code)}</header>` : ""}
-    <div class="code-wrap">${title ? "" : copyBtn(code)}<pre class="code"><code>${highlight(code)}</code></pre></div></div>`;
+  /** outs : sorties réelles de l'exemple (examples.js), affichées sous le code */
+  const codeBlock = (code, title, outs) => `<div class="card code-card">${title ? `<header class="card-head"><span class="crumb">${title}</span>${copyBtn(code)}</header>` : ""}
+    <div class="code-wrap">${title ? "" : copyBtn(code)}<pre class="code"><code>${highlight(code)}</code></pre></div>
+    ${outs && outs.length ? outputsHtml(outs, { open: true, keepOrder: true, label: "Résultat" }) : ""}</div>`;
+  const dataNote = () => (EX.preamble ? `<p class="data-note">Exécuté sur un petit jeu de données fictif (<code>df</code>, <code>X</code>, <code>y</code>, <code>res</code>…) — <a href="#donnees">voir les données d'exemple</a></p>` : "");
 
   function courseCard(g, opt = {}, hidden = false) {
     const c = g.cell, nb = D.notebooks[c.nb];
@@ -365,12 +371,19 @@
       <div class="keys"><span><kbd>/</kbd> chercher</span><span><kbd>↑</kbd> <kbd>↓</kbd> choisir</span><span><kbd>Entrée</kbd> ouvrir</span><span><kbd>Échap</kbd> effacer</span></div>
       <h2 class="sec">Essaie une phrase ou un mot-clé</h2>
       <div class="chips">${EXAMPLES.map((t) => `<button class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      ${EX.preamble ? `<p class="data-note">Tous les exemples sont exécutés pour de vrai, avec leur résultat (tableau, valeurs, graphique), sur un petit jeu de données fictif — <a href="#donnees">voir les données d'exemple</a>.</p>` : ""}
       <h2 class="sec">Le déroulé d'une analyse — recettes</h2>
       <div class="pipeline">${pipeline}</div>
       <h2 class="sec">Librairies</h2>
       <div class="libgrid">${libs}</div>
       ${state.train ? "" : `<h2 class="sec">Cours & solutions</h2><div class="nblist">${nbs}</div>`}
     </div>`;
+  }
+
+  /** aperçu des premières lignes de code utiles (sans imports ni commentaires) dans un résultat */
+  function codePreview(code, n = 3) {
+    const lines = code.split("\n").filter((l) => l.trim() && !/^\s*(#|import |from \S+ import )/.test(l)).slice(0, n);
+    return lines.length ? `<pre class="hit-code">${highlight(lines.join("\n"))}</pre>` : "";
   }
 
   function viewSearch(q) {
@@ -396,14 +409,16 @@
     const recHits = recs.map((r, i) => `<a class="hit${i >= 4 ? " more-hidden" : ""}" href="${recHref(r.doc.ref.id)}">
         <div class="hit-title">📘 ${S.markText(r.doc.ref.title, terms)}</div>
         <div class="hit-meta">Recette · ${esc(r.doc.ref.cat)}</div>
-        <div class="hit-snip">${S.snippet(r.doc.ref.intro, terms)}</div></a>`).join("");
+        <div class="hit-snip">${S.snippet(r.doc.ref.intro, terms)}</div>
+        ${codePreview(r.doc.ref.steps.map((s) => s[1]).join("\n"))}</a>`).join("");
     const fnHits = fns.map((r, i) => {
       const f = r.doc.ref;
       const vis = visibleCells(f).length;
       return `<a class="hit${i >= 6 ? " more-hidden" : ""}" href="${fnHref(f.key)}">
         <div class="hit-title"><span class="lib-dot" style="--c:${libColor(f.lib)}"></span><code>${esc(f.display)}</code>
           <span class="hit-lib">${esc(libLabel(f.lib))}${f.cat ? " · " + esc(f.cat) : ""}</span>${vis ? `<span class="cnt" title="exemples dans tes notebooks">${vis} ex.</span>` : ""}</div>
-        ${f.desc ? `<div class="hit-snip">${S.markText(f.desc, terms)}</div>` : ""}</a>`;
+        ${f.desc ? `<div class="hit-snip">${S.markText(f.desc, terms)}</div>` : ""}
+        ${codePreview(f.ex || "")}</a>`;
     }).join("");
     const cellHits = cellGroups.map((g, i) => {
       const c = g.cell, nb = D.notebooks[c.nb];
@@ -458,7 +473,7 @@
       </div>
       ${f.sig ? `<h2 class="sec">Signature</h2><pre class="code sig"><code>${highlight(f.sig)}</code></pre>` : ""}
       ${f.note ? `<div class="note">💡 ${esc(f.note)}</div>` : ""}
-      ${f.ex ? `<h2 class="sec">Exemple général</h2>${codeBlock(f.ex)}` : ""}
+      ${f.ex ? `<h2 class="sec">Exemple${f.exOut && f.exOut.length ? " et résultat" : ""}</h2>${dataNote()}${codeBlock(f.ex, null, f.exOut)}` : ""}
       ${recs.length ? `<h2 class="sec">Recettes qui l'utilisent</h2><div class="chips">${recs.map(recChip).join("")}</div>` : ""}
       ${state.train ? "" : `<h2 class="sec">Dans tes notebooks <span class="cnt">${groups.length}</span></h2>
       ${groups.length ? cardsHtml(groups, { fn: f.short }) : noCourse()}`}
@@ -482,11 +497,13 @@
     if (!r) return `<div class="empty">Recette inconnue.</div>`;
     const same = RECIPES.filter((x) => x.cat === r.cat && x.id !== r.id);
     const groups = relatedCells(r);
-    const steps = r.steps.map(([txt, code]) => `<div class="step">${txt ? `<p>${inline(txt)}</p>` : ""}${code ? codeBlock(code) : ""}</div>`).join("");
+    const outs = (EX.rec && EX.rec[r.id]) || [];
+    const steps = r.steps.map(([txt, code], k) => `<div class="step">${txt ? `<p>${inline(txt)}</p>` : ""}${code ? codeBlock(code, null, outs[k]) : ""}</div>`).join("");
     return `<div class="fhead">
         <div class="crumbs"><a href="#recettes">Recettes</a> › ${esc(r.cat)}</div>
         <h1>${esc(r.title)}</h1>
         <p class="desc">${esc(r.intro)}</p>
+        ${dataNote()}
       </div>
       <div class="steps">${steps}</div>
       ${r.tips && r.tips.length ? `<div class="note"><b>À retenir</b><ul>${r.tips.map((t) => `<li>${inline(t)}</li>`).join("")}</ul></div>` : ""}
@@ -555,6 +572,21 @@
       <div class="notebook">${cells}</div>`;
   }
 
+  function viewDonnees() {
+    if (!EX.preamble) return `<div class="empty">Les exemples n'ont pas encore été exécutés (lance <code>run_examples.py</code>).</div>`;
+    const cols = (EX.cols || []).map(([c, t, v]) => `<tr><td><code>${esc(c)}</code></td><td>${esc(t)}</td><td><code>${esc(v)}</code></td></tr>`).join("");
+    return `<div class="fhead"><div class="crumbs">Exemples</div><h1>Données d'exemple</h1>
+      <p class="desc">Tous les exemples des fiches et des recettes sont <b>vraiment exécutés</b> sur ces données fictives, et les résultats affichés sont leurs vraies sorties.
+      Pour les reproduire, colle ce code dans un notebook avant l'exemple.</p></div>
+      <p class="data-note">Dans une recette, les étapes s'enchaînent, et les recettes d'une même catégorie aussi (ex. score de propension → matching → équilibre).</p>
+      <h2 class="sec">Aperçu de <code>df</code> (200 lignes)</h2>
+      <div class="card"><div class="out-body out-html">${EX.df || ""}</div></div>
+      <h2 class="sec">Colonnes de <code>df</code></h2>
+      <div class="card"><div class="out-body md-table"><table><thead><tr><th>Colonne</th><th>Type</th><th>1re valeur</th></tr></thead><tbody>${cols}</tbody></table></div></div>
+      <h2 class="sec">Code qui crée les données</h2>
+      ${codeBlock(EX.preamble)}`;
+  }
+
   function viewCode(text) {
     const cells = D.cells.filter((c) => cellVisible(c) && codeMatch(c, text));
     const groups = dedupe(cells);
@@ -619,6 +651,7 @@
     if (p.has("code")) return { type: "code", text: p.get("code") };
     if (p.has("recettes")) return { type: "recipes" };
     if (p.has("notebooks")) return { type: "notebooks" };
+    if (p.has("donnees")) return { type: "donnees" };
     return { type: "home" };
   }
 
@@ -634,6 +667,7 @@
       case "lib": html = viewLib(r.lib); title = r.lib; break;
       case "nb": html = state.train ? trainBlocked() : viewNotebook(r.nb); title = D.notebooks[r.nb] ? D.notebooks[r.nb].title : title; break;
       case "notebooks": html = state.train ? trainBlocked() : viewNotebooks(); title = "Notebooks"; break;
+      case "donnees": html = viewDonnees(); title = "Données d'exemple"; break;
       case "code": html = state.train ? trainBlocked() : viewCode(r.text); break;
       default: html = viewHome();
     }

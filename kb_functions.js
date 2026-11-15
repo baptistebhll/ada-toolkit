@@ -137,7 +137,7 @@ df['total'] = df.apply(lambda r: r.a + r.b, axis=1)`, "appliquer fonction lambda
     "one hot dummy dummies indicatrices encoder categorielle encoding categorical",
     "drop_first=True évite la colinéarité parfaite en régression linéaire.");
   F(L, C, "pd.Categorical", "pd.Categorical(values, categories=None, ordered=False)", "Variable catégorielle avec ordre des catégories.",
-    `df['taille'] = pd.Categorical(df['taille'], categories=['S', 'M', 'L'], ordered=True)`, "categorie ordre ordonnee categorical");
+    `df['tshirt'] = pd.Categorical(df['tshirt'], categories=['S', 'M', 'L'], ordered=True)`, "categorie ordre ordonnee categorical");
   F(L, C, "df.sort_values", "df.sort_values(by, ascending=True)", "Trier selon une ou plusieurs colonnes.",
     `df.sort_values('score', ascending=False)
 df.sort_values(['pays', 'age'], ascending=[True, False])`, "trier ordonner classer tri sort order");
@@ -152,8 +152,8 @@ df.sort_values(['pays', 'age'], ascending=[True, False])`, "trier ordonner class
   F(L, C, "df.explode", "df.explode(colonne)", "Une ligne par élément d'une colonne contenant des listes.",
     `df.assign(tag=df['tags'].str.split(',')).explode('tag')`, "liste eclater une ligne par element explode split");
   F(L, C, "df.iterrows", "df.iterrows()", "Boucler sur les lignes (index, ligne). Lent : à éviter si possible.",
-    `for i, row in df.iterrows():
-    print(row['nom'])`, "boucle iterer lignes for loop");
+    `for i, row in df.head(3).iterrows():
+    print(i, row['nom'], row['age'])`, "boucle iterer lignes for loop");
 
   C = "Grouper / agréger";
   F(L, C, "df.groupby", "df.groupby(colonnes, as_index=True)[col].agg(...)",
@@ -172,8 +172,8 @@ df.groupby('pays', as_index=False).agg(moy=('revenu', 'mean'),
 df['ecart'] = df['revenu'] - df['moy_pays']`, "moyenne du groupe chaque ligne normaliser par groupe transform");
   F(L, C, "pd.crosstab", "pd.crosstab(index, columns, normalize=False, margins=False)",
     "Tableau croisé (contingence) de deux variables catégorielles.",
-    `pd.crosstab(df['traitement'], df['resultat'])
-pd.crosstab(df['traitement'], df['resultat'], normalize='index')   # % par ligne`,
+    `pd.crosstab(df['traitement'], df['guerison'])
+pd.crosstab(df['traitement'], df['guerison'], normalize='index')   # % par ligne`,
     "tableau croise contingence compter combinaisons frequence deux categorielles crosstab contingency chi2");
   F(L, C, "df.pivot_table", "df.pivot_table(index, columns, values, aggfunc='mean')", "Tableau croisé avec agrégation.",
     `df.pivot_table(index='pays', columns='annee', values='revenu', aggfunc='mean')`, "pivot tableau croise remodeler agreger pivot table");
@@ -192,7 +192,7 @@ df[['a', 'b']].corr(method='spearman')`, "correlation matrice lien relation pear
   F(L, C, "pd.merge", "pd.merge(left, right, on=None, how='inner', left_on=None, right_on=None, validate=None)",
     "Joindre deux DataFrames sur une ou plusieurs colonnes (JOIN SQL).",
     `df = pd.merge(clients, achats, on='client_id', how='left')
-df = pd.merge(a, b, left_on='id', right_on='user_id', how='inner', validate='one_to_many')`,
+df = pd.merge(clients, achats.rename(columns={'client_id': 'id_client'}), left_on='client_id', right_on='id_client', how='inner')`,
     "joindre jointure fusionner combiner relier deux tables join merge",
     "how : 'inner' (par défaut, garde les correspondances), 'left', 'outer'. Vérifie le nombre de lignes avant/après ; validate='one_to_one' détecte les doublons de clés.");
   F(L, C, "df.merge", "df.merge(autre, on=..., how=...)", "Même chose que pd.merge, en méthode.",
@@ -201,12 +201,12 @@ df = pd.merge(a, b, left_on='id', right_on='user_id', how='inner', validate='one
     `df = pd.concat([df2019, df2020], ignore_index=True)
 df = pd.concat([X, y], axis=1)`, "empiler concatener coller ajouter lignes combiner append stack concat");
   F(L, C, "pd.melt", "pd.melt(df, id_vars, value_vars, var_name, value_name)", "Format large → format long.",
-    `long = pd.melt(df, id_vars=['pays'], var_name='annee', value_name='pib')`, "remodeler long large wide reshape melt");
+    `long = pd.melt(large.reset_index(), id_vars=['pays'], var_name='annee', value_name='pib')`, "remodeler long large wide reshape melt");
   F(L, C, "df.pivot", "df.pivot(index, columns, values)", "Format long → format large (sans agrégation).",
     `large = long.pivot(index='pays', columns='annee', values='pib')`, "remodeler large wide pivot reshape");
   F(L, C, "df.unstack", "df.unstack(level=-1)", "Passer un niveau d'index en colonnes (après un groupby à 2 clés).",
     `df.groupby(['pays', 'sexe'])['revenu'].mean().unstack()`, "remodeler pivot colonnes index reshape unstack");
-  F(L, C, "df.stack", "df.stack()", "Passer les colonnes en niveau d'index (inverse de unstack).", `df.stack()`, "remodeler reshape stack");
+  F(L, C, "df.stack", "df.stack()", "Passer les colonnes en niveau d'index (inverse de unstack).", `large.stack()`, "remodeler reshape stack");
 
   C = "Dates, texte, temps";
   F(L, C, "pd.to_datetime", "pd.to_datetime(s, format=None, errors='raise', unit=None)", "Convertir en dates.",
@@ -280,38 +280,68 @@ axes[0].hist(a, bins=30); axes[0].set_title('A')
 axes[1].hist(b, bins=30); axes[1].set_title('B')
 plt.tight_layout(); plt.show()`, "sous graphiques plusieurs graphiques cote a cote grille figure axes subplot subplots",
     "Avec une grille 2D, boucler sur axes.flat ; passer ax=axes[i] aux fonctions seaborn.");
-  F(L, C, "plt.figure", "plt.figure(figsize=(w, h))", "Nouvelle figure (taille en pouces).", `plt.figure(figsize=(8, 5))`, "figure taille figsize");
+  F(L, C, "plt.figure", "plt.figure(figsize=(w, h))", "Nouvelle figure (taille en pouces).", `plt.figure(figsize=(8, 3))
+plt.plot(df['date'], df['ventes'])`, "figure taille figsize");
   F(L, C, "ax.set", "ax.set(xlabel=, ylabel=, title=, xscale=, yscale=, xlim=)", "Régler titres / échelles d'un sous-graphique en une ligne.",
-    `ax.set(xlabel='Revenu', ylabel='Densité', title='Distribution', xscale='log')`, "titre axe label echelle log sous graphique set");
-  F(L, C, "ax.set_title", "ax.set_title(texte)", "Titre d'un sous-graphique.", `axes[0].set_title('Groupe A')`, "titre sous graphique title");
-  F(L, C, "ax.set_xlabel", "ax.set_xlabel(texte)", "Titre de l'axe x d'un sous-graphique (set_ylabel pour y).", `ax.set_xlabel('Âge')`, "axe label titre");
-  F(L, C, "ax.set_ylabel", "ax.set_ylabel(texte)", "Titre de l'axe y d'un sous-graphique.", `ax.set_ylabel('Effectif')`, "axe label titre");
-  F(L, C, "plt.tight_layout", "plt.tight_layout()", "Éviter que les titres se chevauchent.", `plt.tight_layout()`, "chevauchement espacement layout");
-  F(L, C, "plt.savefig", "plt.savefig(path, dpi=150, bbox_inches='tight')", "Sauvegarder la figure.", `plt.savefig('figure.png', dpi=150, bbox_inches='tight')`, "sauvegarder image exporter save png");
-  F(L, C, "plt.show", "plt.show()", "Afficher la figure.", `plt.show()`, "afficher montrer show");
+    `fig, ax = plt.subplots()
+ax.hist(df['revenu'], bins=np.logspace(4, 6, 30))
+ax.set(xlabel='Revenu', ylabel='Effectif', title='Distribution', xscale='log')`, "titre axe label echelle log sous graphique set");
+  F(L, C, "ax.set_title", "ax.set_title(texte)", "Titre d'un sous-graphique.", `fig, axes = plt.subplots(1, 2, figsize=(10, 3.5))
+axes[0].hist(df.loc[df.groupe == 'A', 'score']); axes[0].set_title('Groupe A')
+axes[1].hist(df.loc[df.groupe == 'B', 'score']); axes[1].set_title('Groupe B')`, "titre sous graphique title");
+  F(L, C, "ax.set_xlabel", "ax.set_xlabel(texte)", "Titre de l'axe x d'un sous-graphique (set_ylabel pour y).", `fig, ax = plt.subplots()
+ax.hist(df['age'], bins=20)
+ax.set_xlabel('Âge')`, "axe label titre");
+  F(L, C, "ax.set_ylabel", "ax.set_ylabel(texte)", "Titre de l'axe y d'un sous-graphique.", `fig, ax = plt.subplots()
+ax.hist(df['age'], bins=20)
+ax.set_ylabel('Effectif')`, "axe label titre");
+  F(L, C, "plt.tight_layout", "plt.tight_layout()", "Éviter que les titres se chevauchent.", `fig, axes = plt.subplots(1, 2, figsize=(8, 3))
+axes[0].hist(df['age']); axes[0].set_title('Âge')
+axes[1].hist(df['score']); axes[1].set_title('Score')
+plt.tight_layout()`, "chevauchement espacement layout");
+  F(L, C, "plt.savefig", "plt.savefig(path, dpi=150, bbox_inches='tight')", "Sauvegarder la figure.", `plt.hist(df['age'], bins=20)
+plt.savefig('figure.png', dpi=150, bbox_inches='tight')`, "sauvegarder image exporter save png");
+  F(L, C, "plt.show", "plt.show()", "Afficher la figure.", `plt.hist(df['age'], bins=20)
+plt.show()`, "afficher montrer show");
   C = "Types de graphiques";
-  F(L, C, "plt.plot", "plt.plot(x, y, fmt, label=None)", "Courbe / ligne.", `plt.plot(x, y, '-o', label='modèle')`, "courbe ligne tracer evolution line plot");
+  F(L, C, "plt.plot", "plt.plot(x, y, fmt, label=None)", "Courbe / ligne.", `xs = np.linspace(0, 10, 20)
+plt.plot(xs, np.sqrt(xs), '-o', label='modèle')
+plt.legend()`, "courbe ligne tracer evolution line plot");
   F(L, C, "plt.scatter", "plt.scatter(x, y, s=None, c=None, alpha=None)", "Nuage de points.", `plt.scatter(df.x, df.y, alpha=0.3, s=10)`, "nuage points scatter relation deux variables");
   F(L, C, "plt.hist", "plt.hist(x, bins=10, density=False, log=False, histtype='bar', alpha=None)", "Histogramme.",
     `plt.hist(df['age'], bins=30, alpha=0.6, label='A')
-plt.hist(x, bins=np.logspace(0, 5, 50)); plt.xscale('log')`, "histogramme distribution frequences histogram",
+plt.hist(df.loc[df.groupe == 'B', 'age'], bins=30, alpha=0.6, label='B')
+plt.legend()`, "histogramme distribution frequences histogram",
     "density=True pour comparer des groupes de tailles différentes.");
-  F(L, C, "plt.bar", "plt.bar(x, hauteurs, yerr=None)", "Diagramme en barres (barh pour horizontal).", `plt.bar(s.index, s.values, yerr=erreurs, capsize=4)`, "barres diagramme categories bar");
-  F(L, C, "plt.boxplot", "plt.boxplot(donnees)", "Boîte à moustaches.", `plt.boxplot([a, b], labels=['A', 'B'])`, "boite moustaches boxplot quartiles");
+  F(L, C, "plt.bar", "plt.bar(x, hauteurs, yerr=None)", "Diagramme en barres (barh pour horizontal).", `moy = df.groupby('pays')['revenu'].mean()
+err = df.groupby('pays')['revenu'].sem()
+plt.bar(moy.index, moy.values, yerr=err, capsize=4)`, "barres diagramme categories bar");
+  F(L, C, "plt.boxplot", "plt.boxplot(donnees)", "Boîte à moustaches.", `plt.boxplot([a, b])
+plt.xticks([1, 2], ['A', 'B'])`, "boite moustaches boxplot quartiles");
   F(L, C, "plt.errorbar", "plt.errorbar(x, y, yerr=None, fmt='o', capsize=None)", "Points avec barres d'erreur (IC).",
-    `plt.errorbar(x, moyennes, yerr=[moy - bas, haut - moy], fmt='o', capsize=4)`, "barres erreur intervalle confiance ic error bar incertitude");
-  F(L, C, "plt.fill_between", "plt.fill_between(x, bas, haut, alpha=0.3)", "Bande colorée (IC autour d'une courbe).", `plt.fill_between(x, bas, haut, alpha=0.3)`, "bande zone intervalle confiance remplir");
+    `plt.errorbar(groupes, moyennes, yerr=[moyennes - bas, haut - moyennes], fmt='o', capsize=4)`, "barres erreur intervalle confiance ic error bar incertitude");
+  F(L, C, "plt.fill_between", "plt.fill_between(x, bas, haut, alpha=0.3)", "Bande colorée (IC autour d'une courbe).", `xs = np.linspace(0, 10, 50)
+plt.plot(xs, np.sin(xs))
+plt.fill_between(xs, np.sin(xs) - 0.3, np.sin(xs) + 0.3, alpha=0.3)`, "bande zone intervalle confiance remplir");
   F(L, C, "plt.axvline", "plt.axvline(x, color, linestyle='--')", "Ligne verticale (axhline : horizontale), ex. moyenne.",
     `plt.axvline(x.mean(), color='red', linestyle='--', label='moyenne')`, "ligne verticale horizontale seuil moyenne repere");
   F(L, C, "plt.loglog", "plt.loglog(x, y)", "Deux axes en échelle log (lois de puissance).", `plt.loglog(degres, ccdf, '.')`, "log log echelle loi puissance power law heavy tail");
   C = "Habillage";
-  F(L, C, "plt.xlabel", "plt.xlabel(texte)", "Titre de l'axe x.", `plt.xlabel('Âge (années)')`, "axe titre label x");
-  F(L, C, "plt.ylabel", "plt.ylabel(texte)", "Titre de l'axe y.", `plt.ylabel('Effectif')`, "axe titre label y");
-  F(L, C, "plt.title", "plt.title(texte)", "Titre du graphique.", `plt.title('Distribution des âges')`, "titre title");
-  F(L, C, "plt.legend", "plt.legend(loc='best')", "Afficher la légende (labels définis via label=...).", `plt.legend()`, "legende legend");
-  F(L, C, "plt.xscale", "plt.xscale('log') / plt.yscale('log')", "Échelle log sur un axe.", `plt.yscale('log')`, "echelle log logarithmique axe");
-  F(L, C, "plt.xlim", "plt.xlim(a, b) / plt.ylim(a, b)", "Limites des axes.", `plt.xlim(0, 100)`, "limites zoom axe");
-  F(L, C, "plt.xticks", "plt.xticks(rotation=45)", "Graduations de l'axe x (rotation des étiquettes).", `plt.xticks(rotation=45, ha='right')`, "graduations etiquettes rotation ticks");
+  F(L, C, "plt.xlabel", "plt.xlabel(texte)", "Titre de l'axe x.", `plt.hist(df['age'], bins=20)
+plt.xlabel('Âge (années)')`, "axe titre label x");
+  F(L, C, "plt.ylabel", "plt.ylabel(texte)", "Titre de l'axe y.", `plt.hist(df['age'], bins=20)
+plt.ylabel('Effectif')`, "axe titre label y");
+  F(L, C, "plt.title", "plt.title(texte)", "Titre du graphique.", `plt.hist(df['age'], bins=20)
+plt.title('Distribution des âges')`, "titre title");
+  F(L, C, "plt.legend", "plt.legend(loc='best')", "Afficher la légende (labels définis via label=...).", `plt.hist(df.loc[df.sexe == 'F', 'age'], alpha=0.6, label='F')
+plt.hist(df.loc[df.sexe == 'M', 'age'], alpha=0.6, label='M')
+plt.legend()`, "legende legend");
+  F(L, C, "plt.xscale", "plt.xscale('log') / plt.yscale('log')", "Échelle log sur un axe.", `plt.hist(df['degre'], bins=30)
+plt.yscale('log')`, "echelle log logarithmique axe");
+  F(L, C, "plt.xlim", "plt.xlim(a, b) / plt.ylim(a, b)", "Limites des axes.", `plt.scatter(df['x'], df['y'], s=8)
+plt.xlim(0, 8)`, "limites zoom axe");
+  F(L, C, "plt.xticks", "plt.xticks(rotation=45)", "Graduations de l'axe x (rotation des étiquettes).", `df['categorie'].value_counts().plot(kind='bar')
+plt.xticks(rotation=45, ha='right')`, "graduations etiquettes rotation ticks");
 
   // ======================================================================================= SEABORN
   L = "seaborn"; C = "Distributions";
@@ -326,14 +356,14 @@ plt.hist(x, bins=np.logspace(0, 5, 50)); plt.xscale('log')`, "histogramme distri
     "complementary=True donne la CCDF : sur axes log-log, une droite suggère une loi de puissance.");
   F(L, C, "sns.boxplot", "sns.boxplot(data, x, y, hue=None)", "Boîtes à moustaches par catégorie.", `sns.boxplot(data=df, x='groupe', y='revenu')`, "boite moustaches boxplot comparer groupes quartiles");
   F(L, C, "sns.violinplot", "sns.violinplot(data, x, y, hue=None)", "Violons : distribution par catégorie.", `sns.violinplot(data=df, x='groupe', y='revenu')`, "violon distribution comparer groupes");
-  F(L, C, "sns.stripplot", "sns.stripplot(data, x, y)", "Tous les points par catégorie.", `sns.stripplot(data=df, x='g', y='v', alpha=0.3)`, "points categorie");
+  F(L, C, "sns.stripplot", "sns.stripplot(data, x, y)", "Tous les points par catégorie.", `sns.stripplot(data=df, x='groupe', y='score', alpha=0.5)`, "points categorie");
   C = "Catégories";
   F(L, C, "sns.barplot", "sns.barplot(data, x, y, hue=None, estimator='mean', errorbar=('ci', 95))",
     "Barres = moyenne par catégorie + intervalle de confiance bootstrap.", `sns.barplot(data=df, x='groupe', y='revenu', errorbar=('ci', 95))`,
     "barres moyenne par groupe intervalle confiance comparer categories bar");
   F(L, C, "sns.countplot", "sns.countplot(data, x, hue=None)", "Effectif de chaque catégorie.", `sns.countplot(data=df, x='pays', order=df['pays'].value_counts().index)`, "compter effectifs categories barres count");
   F(L, C, "sns.pointplot", "sns.pointplot(data, x, y, hue=None)", "Moyennes + IC reliées (évolution par catégorie).", `sns.pointplot(data=df, x='annee', y='score', hue='groupe')`, "moyenne intervalle confiance evolution points");
-  F(L, C, "sns.catplot", "sns.catplot(data, x, y, kind='bar', col=None)", "Graphique catégoriel en plusieurs panneaux (col=…).", `sns.catplot(data=df, x='g', y='v', col='pays', kind='box')`, "plusieurs panneaux categories facettes facet");
+  F(L, C, "sns.catplot", "sns.catplot(data, x, y, kind='bar', col=None)", "Graphique catégoriel en plusieurs panneaux (col=…).", `sns.catplot(data=df, x='groupe', y='score', col='pays', kind='box')`, "plusieurs panneaux categories facettes facet");
   C = "Relations";
   F(L, C, "sns.scatterplot", "sns.scatterplot(data, x, y, hue=None, size=None, alpha=None)", "Nuage de points (couleur par groupe).", `sns.scatterplot(data=df, x='a', y='b', hue='groupe', alpha=0.5)`, "nuage points scatter relation deux variables");
   F(L, C, "sns.lineplot", "sns.lineplot(data, x, y, hue=None)", "Courbe avec IC (agrège les x répétés).", `sns.lineplot(data=df, x='annee', y='ventes', hue='pays')`, "courbe evolution temps ligne line");
@@ -342,9 +372,10 @@ plt.hist(x, bins=np.logspace(0, 5, 50)); plt.xscale('log')`, "histogramme distri
   F(L, C, "sns.jointplot", "sns.jointplot(data, x, y, kind='scatter')", "Nuage + distributions marginales (kind='hex' pour beaucoup de points).", `sns.jointplot(data=df, x='a', y='b', kind='hex')`, "nuage marginales relation deux variables hexbin");
   F(L, C, "sns.pairplot", "sns.pairplot(data, vars=None, hue=None)", "Tous les nuages de points 2 à 2.", `sns.pairplot(df[['a', 'b', 'c', 'groupe']], hue='groupe')`, "toutes variables paires relations scatter matrix");
   F(L, C, "sns.heatmap", "sns.heatmap(data, annot=False, fmt='.2g', cmap=None, center=None)", "Carte de chaleur (matrice de corrélation, tableau croisé).",
-    `sns.heatmap(df.corr(numeric_only=True), annot=True, fmt='.2f', cmap='coolwarm', center=0)`, "heatmap carte chaleur matrice correlation tableau");
+    `sns.heatmap(df[['age', 'revenu', 'score', 'a', 'b', 'c']].corr(), annot=True, fmt='.2f', cmap='coolwarm', center=0)`, "heatmap carte chaleur matrice correlation tableau");
   C = "Style";
-  F(L, C, "sns.set_theme", "sns.set_theme(style='whitegrid', context='notebook')", "Style global des graphiques.", `sns.set_theme(style='whitegrid')`, "style theme apparence");
+  F(L, C, "sns.set_theme", "sns.set_theme(style='whitegrid', context='notebook')", "Style global des graphiques.", `sns.set_theme(style='whitegrid')
+sns.histplot(data=df, x='age')`, "style theme apparence");
 
   // ======================================================================================= SCIPY
   L = "scipy"; C = "Tests statistiques";
@@ -361,7 +392,7 @@ plt.hist(x, bins=np.logspace(0, 5, 50)); plt.xscale('log')`, "histogramme distri
     `table = pd.crosstab(df['traitement'], df['resultat'])
 chi2, p, dof, expected = stats.chi2_contingency(table)`, "chi2 khi deux independance categorielles contingence association test",
     "Effectifs attendus ≥ 5 dans chaque case, sinon stats.fisher_exact (tableau 2x2).");
-  F(L, C, "stats.f_oneway", "stats.f_oneway(g1, g2, g3, ...)", "ANOVA : plusieurs groupes ont-ils la même moyenne ?", `stats.f_oneway(*[g['v'] for _, g in df.groupby('groupe')])`, "anova plusieurs groupes moyennes comparer");
+  F(L, C, "stats.f_oneway", "stats.f_oneway(g1, g2, g3, ...)", "ANOVA : plusieurs groupes ont-ils la même moyenne ?", `stats.f_oneway(*[g['score'] for _, g in df.groupby('pays')])`, "anova plusieurs groupes moyennes comparer");
   F(L, C, "stats.kstest", "stats.kstest(x, 'norm', args=(mu, sigma))", "Kolmogorov-Smirnov : x suit-il une loi donnée ?", `stats.kstest(x, 'norm', args=(x.mean(), x.std()))`, "kolmogorov smirnov ks loi distribution normalite test");
   F(L, C, "stats.ks_2samp", "stats.ks_2samp(a, b)", "Deux échantillons viennent-ils de la même distribution ?", `stats.ks_2samp(a, b)`, "kolmogorov smirnov deux echantillons meme distribution comparer");
   F(L, C, "stats.shapiro", "stats.shapiro(x)", "Test de normalité de Shapiro-Wilk (petits échantillons).", `stat, p = stats.shapiro(x)`, "normalite loi normale shapiro test gaussienne");
@@ -411,7 +442,8 @@ stat, p = diagnostic.kstest_normal(df['x'], dist='norm')`, "normalite kolmogorov
     "Correction pour tests multiples (bonferroni, holm, fdr_bh).",
     `from statsmodels.stats.multitest import multipletests
 reject, p_corr, _, _ = multipletests(pvals, method='fdr_bh')`, "tests multiples bonferroni correction fdr benjamini comparaisons multiples");
-  F(L, C, "statsmodels.stats.proportion.binom_test", "binom_test(k, n, prop=0.5)", "Test binomial sur une proportion.", `binom_test(62, 100, 0.5)`, "proportion binomial test");
+  F(L, C, "statsmodels.stats.proportion.binom_test", "binom_test(k, n, prop=0.5)", "Test binomial sur une proportion.", `from statsmodels.stats.proportion import binom_test
+binom_test(62, 100, 0.5)`, "proportion binomial test");
 
   // ======================================================================================= SCIKIT-LEARN
   L = "scikit-learn"; C = "Préparer les données";
@@ -428,7 +460,8 @@ X_train_s, X_test_s = scaler.transform(X_train), scaler.transform(X_test)`,
     "standardiser normaliser mettre echelle scaling scaler centrer reduire", "fit sur le train uniquement, puis transform train ET test.");
   F(L, C, "sklearn.preprocessing.OneHotEncoder", "OneHotEncoder(handle_unknown='ignore')", "One-hot dans un pipeline sklearn.",
     `from sklearn.preprocessing import OneHotEncoder
-enc = OneHotEncoder(handle_unknown='ignore').fit(X_train[['pays']])`, "one hot categorielle encoder dummies");
+enc = OneHotEncoder(handle_unknown='ignore').fit(df[['pays']])
+enc.transform(df[['pays']].head()).toarray()`, "one hot categorielle encoder dummies");
   F(L, C, "sklearn.pipeline.make_pipeline", "make_pipeline(etape1, etape2, ..., modele)", "Enchaîner prétraitement + modèle (évite les fuites de données).",
     `from sklearn.pipeline import make_pipeline
 model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
@@ -493,7 +526,8 @@ fpr, tpr, _ = roc_curve(y_test, proba)
 plt.plot(fpr, tpr, label=f'AUC = {roc_auc_score(y_test, proba):.2f}')
 plt.plot([0, 1], [0, 1], '--')`, "roc courbe faux positifs seuil classification evaluation");
   F(L, C, "sklearn.metrics.roc_auc_score", "roc_auc_score(y_true, scores)", "Aire sous la courbe ROC.", `roc_auc_score(y_test, proba)`, "auc aire roc evaluation");
-  F(L, C, "sklearn.metrics.auc", "auc(x, y)", "Aire sous une courbe (ex. auc(fpr, tpr)).", `auc(fpr, tpr)`, "auc aire courbe roc");
+  F(L, C, "sklearn.metrics.auc", "auc(x, y)", "Aire sous une courbe (ex. auc(fpr, tpr)).", `from sklearn.metrics import auc
+auc(fpr, tpr)`, "auc aire courbe roc");
   F(L, C, "sklearn.metrics.mean_squared_error", "mean_squared_error(y_true, y_pred)", "Erreur quadratique moyenne (MSE).", `from sklearn.metrics import mean_squared_error
 mse = mean_squared_error(y_test, y_pred)`, "mse erreur quadratique regression evaluation rmse");
   F(L, C, "sklearn.metrics.r2_score", "r2_score(y_true, y_pred)", "R² sur des prédictions.", `from sklearn.metrics import r2_score
@@ -535,7 +569,7 @@ X, y = make_moons(200, noise=0.2)`, "donnees jouet simuler");
     `G = nx.Graph()
 G.add_edge('a', 'b', weight=0.5)`, "graphe reseau creer noeuds aretes network graph");
   F(L, C, "nx.from_pandas_edgelist", "nx.from_pandas_edgelist(df, source, target, edge_attr=None, create_using=None)", "Graphe à partir d'un DataFrame d'arêtes.",
-    `G = nx.from_pandas_edgelist(df, source='from', target='to', edge_attr='weight')`, "graphe reseau dataframe aretes liste edges");
+    `G = nx.from_pandas_edgelist(aretes, source='from', target='to', edge_attr='weight')`, "graphe reseau dataframe aretes liste edges");
   F(L, C, "G.add_weighted_edges_from", "G.add_weighted_edges_from([(u, v, w), ...])", "Ajouter des arêtes pondérées.", `G.add_weighted_edges_from([(1, 2, 0.9), (1, 3, 0.4)])`, "aretes poids ajouter");
   F(L, C, "G.nodes", "G.nodes / G.edges / G.degree", "Nœuds, arêtes, degrés.", `G.number_of_nodes(), G.number_of_edges()
 dict(G.degree())`, "noeuds aretes degre nombre");
