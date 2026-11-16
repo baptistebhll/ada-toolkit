@@ -316,6 +316,10 @@ plt.legend()`, "histogramme distribution frequences histogram",
   F(L, C, "plt.bar", "plt.bar(x, hauteurs, yerr=None)", "Diagramme en barres (barh pour horizontal).", `moy = df.groupby('pays')['revenu'].mean()
 err = df.groupby('pays')['revenu'].sem()
 plt.bar(moy.index, moy.values, yerr=err, capsize=4)`, "barres diagramme categories bar");
+  F(L, C, "plt.barh", "plt.barh(y, largeurs, xerr=None)", "Barres horizontales (pratique pour des noms longs, ex. coefficients triés).",
+    `coefs = pd.Series(clf.coef_[0], index=X_train.columns).sort_values()
+plt.barh(coefs.index, coefs.values)
+plt.axvline(0, color='grey', lw=1)`, "barres horizontales barh coefficients tries classement noms longs");
   F(L, C, "plt.boxplot", "plt.boxplot(donnees)", "Boîte à moustaches.", `plt.boxplot([a, b])
 plt.xticks([1, 2], ['A', 'B'])`, "boite moustaches boxplot quartiles");
   F(L, C, "plt.errorbar", "plt.errorbar(x, y, yerr=None, fmt='o', capsize=None)", "Points avec barres d'erreur (IC).",
@@ -393,7 +397,7 @@ sns.histplot(data=df, x='age')`, "style theme apparence");
 chi2, p, dof, expected = stats.chi2_contingency(table)`, "chi2 khi deux independance categorielles contingence association test",
     "Effectifs attendus ≥ 5 dans chaque case, sinon stats.fisher_exact (tableau 2x2).");
   F(L, C, "stats.f_oneway", "stats.f_oneway(g1, g2, g3, ...)", "ANOVA : plusieurs groupes ont-ils la même moyenne ?", `stats.f_oneway(*[g['score'] for _, g in df.groupby('pays')])`, "anova plusieurs groupes moyennes comparer");
-  F(L, C, "stats.kstest", "stats.kstest(x, 'norm', args=(mu, sigma))", "Kolmogorov-Smirnov : x suit-il une loi donnée ?", `stats.kstest(x, 'norm', args=(x.mean(), x.std()))`, "kolmogorov smirnov ks loi distribution normalite test");
+  F(L, C, "stats.kstest", "stats.kstest(x, stats.norm(loc=mu, scale=sigma).cdf)", "Kolmogorov-Smirnov : x suit-il une loi donnée ?", `stats.kstest(x, stats.norm(loc=x.mean(), scale=x.std()).cdf)`, "kolmogorov smirnov ks loi distribution normalite test", "La forme stats.kstest(x, 'norm', args=(mu, sigma)) plante avec scipy 1.18 (TypeError ndtr) : passer une loi figée stats.norm(loc, scale).cdf, qui marche partout.");
   F(L, C, "stats.ks_2samp", "stats.ks_2samp(a, b)", "Deux échantillons viennent-ils de la même distribution ?", `stats.ks_2samp(a, b)`, "kolmogorov smirnov deux echantillons meme distribution comparer");
   F(L, C, "stats.shapiro", "stats.shapiro(x)", "Test de normalité de Shapiro-Wilk (petits échantillons).", `stat, p = stats.shapiro(x)`, "normalite loi normale shapiro test gaussienne");
   F(L, C, "stats.binomtest", "stats.binomtest(k, n, p=0.5)", "Test binomial sur une proportion.", `stats.binomtest(62, 100, p=0.5).pvalue`, "proportion binomial test pile face");
@@ -475,9 +479,23 @@ lr.coef_, lr.intercept_`, "regression lineaire predire valeur continue linear");
     `from sklearn.linear_model import LogisticRegression
 clf = LogisticRegression(max_iter=1000).fit(X_train, y_train)
 proba = clf.predict_proba(X_test)[:, 1]`, "classification regression logistique classifieur binaire logistic",
-    "C = 1/régularisation : petit C = forte régularisation.");
-  F(L, C, "sklearn.linear_model.Ridge", "Ridge(alpha=1.0)", "Régression linéaire régularisée L2.", `from sklearn.linear_model import Ridge
-Ridge(alpha=1.0).fit(X_train, y_train)`, "ridge regularisation l2 penalite overfitting surapprentissage");
+    "C = 1/régularisation : petit C = forte régularisation. solver='lbfgs' est déjà le défaut (les vieux notebooks l'écrivent juste pour faire taire un ancien FutureWarning). ConvergenceWarning « lbfgs failed to converge » → max_iter=1000 et/ou standardiser les features (ex. 'fare' bien plus grand que les autres).");
+  F(L, C, "sklearn.linear_model.Ridge", "Ridge(alpha=1.0)", "Régression linéaire régularisée L2 : minimise Σ(y − ŷ)² + alpha·Σβⱼ² (l'intercept n'est pas pénalisé).", `from sklearn.linear_model import Ridge
+Xr, yr = df[['surface', 'age']], df['prix']
+for alpha in [0, 6, 1e6]:
+    print(alpha, Ridge(alpha=alpha).fit(Xr, yr).coef_.round(1))`,
+    "ridge regularisation l2 penalite overfitting surapprentissage alpha coefficients",
+    "alpha = 0 → exactement LinearRegression ; alpha grand → coefficients tirés vers 0 (underfitting, on prédit ~ la moyenne). Utile quand peu de lignes / beaucoup de features (overfitting). La pénalité dépend de l'échelle des features → StandardScaler avant. Choisir alpha par validation croisée (RidgeCV), pas à la main.");
+  F(L, C, "sklearn.linear_model.RidgeCV", "RidgeCV(alphas=(0.1, 1.0, 10.0), cv=None)", "Ridge qui choisit lui-même le meilleur alpha par validation croisée (leave-one-out par défaut).",
+    `from sklearn.linear_model import RidgeCV, Ridge
+from sklearn.model_selection import cross_val_predict
+Xr, yr = df[['surface', 'age']], df['prix']
+ridge_cv = RidgeCV(alphas=np.logspace(-2, 6, 50)).fit(Xr, yr)
+ridge_cv.alpha_                      # le meilleur alpha
+ridge = Ridge(alpha=ridge_cv.alpha_) # modèle à alpha FIXE pour l'évaluer ensuite
+cross_val_predict(ridge, Xr, yr, cv=5)[:5]`,
+    "ridgecv choisir meilleur alpha hyperparametre regularisation validation croisee ridge tuning",
+    "Si alpha_ tombe sur le bord de la grille (plus grand ou plus petit alpha testé), élargir la grille. Piège : cross_val_predict(RidgeCV(...)) re-choisit alpha dans CHAQUE fold (nested CV) → MSE différente (plus honnête) que cross_val_predict(Ridge(alpha=alpha_)). Pour un alpha fixe, passer un Ridge. Vérifier X.shape : en notebook, une cellule relancée dans le désordre change X (ex. 200 lignes au lieu de 5) et donc alpha_.");
   F(L, C, "sklearn.linear_model.Lasso", "Lasso(alpha=1.0)", "Régression linéaire régularisée L1 (sélection de variables).", `from sklearn.linear_model import Lasso
 Lasso(alpha=0.1).fit(X_train, y_train)`, "lasso regularisation l1 selection variables parcimonie");
   F(L, C, "sklearn.neighbors.KNeighborsClassifier", "KNeighborsClassifier(n_neighbors=5)", "k plus proches voisins.",
@@ -493,11 +511,20 @@ pd.Series(rf.feature_importances_, index=X.columns).sort_values()`, "foret aleat
   F(L, C, "sklearn.ensemble.RandomForestRegressor", "RandomForestRegressor(n_estimators=100)", "Forêt aléatoire pour une cible continue.", `from sklearn.ensemble import RandomForestRegressor`, "foret aleatoire regression random forest");
   F(L, C, "sklearn.ensemble.GradientBoostingClassifier", "GradientBoostingClassifier()", "Boosting d'arbres.", `from sklearn.ensemble import GradientBoostingClassifier`, "boosting gradient arbres");
   C = "Méthodes communes des modèles";
-  F(L, C, "model.fit", "model.fit(X, y)", "Entraîner / ajuster un modèle (sklearn) — aussi mod.fit() en statsmodels.", `model.fit(X_train, y_train)`, "entrainer ajuster apprendre fit train");
+  F(L, C, "model.fit", "model.fit(X, y)", "Entraîner / ajuster un modèle (sklearn) — aussi mod.fit() en statsmodels.", `model.fit(X_train, y_train)
+LinearRegression().fit(X_train, y_train).predict(X_test)[:3]  # fit renvoie le modèle → on enchaîne`, "entrainer ajuster apprendre fit train",
+    "En sklearn, fit() renvoie le modèle lui-même : on peut enchaîner .predict(). En dernière ligne de cellule, Jupyter affiche la boîte du modèle (Parameters / Fitted attributes) ; un ';' final la cache. Les attributs appris finissent par '_' (coef_, intercept_, alpha_…).");
   F(L, C, "model.predict", "model.predict(X)", "Prédire (classes ou valeurs). En statsmodels : res.predict(df).", `y_pred = model.predict(X_test)`, "predire prediction predict");
   F(L, C, "model.predict_proba", "model.predict_proba(X)", "Probabilités par classe ([:, 1] = classe positive).", `proba = clf.predict_proba(X_test)[:, 1]`, "probabilite proba score classification roc");
   F(L, C, "model.coef_", "model.coef_ / model.intercept_", "Coefficients d'un modèle linéaire entraîné.", `pd.Series(lr.coef_, index=X.columns)`, "coefficients poids coef");
   F(L, C, "model.feature_importances_", "model.feature_importances_", "Importance des variables (arbres, forêts).", `pd.Series(rf.feature_importances_, index=X.columns).nlargest(10)`, "importance variables features");
+  F(L, C, "model.fit_predict", "model.fit_predict(X)", "Entraîner puis renvoyer directement les étiquettes (clustering : KMeans, DBSCAN…).",
+    `labels = KMeans(n_clusters=3, n_init=10, random_state=0).fit_predict(X_s)
+pd.Series(labels).value_counts()`, "fit predict clustering etiquettes labels clusters non supervise");
+  F(L, C, "model.fit_transform", "model.fit_transform(X)", "Apprendre la transformation puis l'appliquer (StandardScaler, PCA, TfidfVectorizer, TSNE…).",
+    `X_s = StandardScaler().fit_transform(X)
+X_s[:3].round(2)`, "fit transform transformer standardiser pca reduction tfidf",
+    "Sur le jeu de test : seulement .transform() avec l'objet appris sur le train (sinon fuite de données).");
   C = "Évaluer";
   F(L, C, "sklearn.model_selection.cross_val_score", "cross_val_score(model, X, y, cv=5, scoring=None)", "Score moyen en validation croisée k-fold.",
     `from sklearn.model_selection import cross_val_score
@@ -505,7 +532,8 @@ scores = cross_val_score(model, X, y, cv=5, scoring='roc_auc')
 scores.mean(), scores.std()`, "validation croisee cross validation k fold evaluer score");
   F(L, C, "sklearn.model_selection.cross_val_predict", "cross_val_predict(model, X, y, cv=5, method='predict')", "Prédictions hors-échantillon en validation croisée.",
     `from sklearn.model_selection import cross_val_predict
-y_pred = cross_val_predict(model, X, y, cv=10)`, "validation croisee predictions cross validation");
+y_pred = cross_val_predict(model, X, y, cv=10)`, "validation croisee predictions cross validation",
+    "Le modèle passé est ré-entraîné de zéro dans chaque fold : un modèle *CV (RidgeCV, GridSearchCV…) y refait sa recherche d'hyperparamètre à chaque fold et n'utilise PAS l'alpha_ trouvé avant.");
   F(L, C, "sklearn.model_selection.GridSearchCV", "GridSearchCV(model, param_grid, cv=5, scoring=None)", "Choisir les hyperparamètres par validation croisée.",
     `from sklearn.model_selection import GridSearchCV
 gs = GridSearchCV(KNeighborsClassifier(), {'n_neighbors': [1, 5, 15, 51]}, cv=5).fit(X_train, y_train)
@@ -562,6 +590,10 @@ X = CountVectorizer(stop_words='english').fit_transform(textes)`, "texte sac mot
   C = "Données jouets";
   F(L, C, "sklearn.datasets.make_moons", "make_moons(n_samples=100, noise=None)", "Jeu de données jouet en deux lunes.", `from sklearn.datasets import make_moons
 X, y = make_moons(200, noise=0.2)`, "donnees jouet simuler");
+  F(L, C, "sklearn.datasets.make_blobs", "make_blobs(n_samples=100, centers=None, cluster_std=1.0, random_state=None)", "Nuages de points gaussiens (pour tester un clustering).",
+    `from sklearn.datasets import make_blobs
+Xb, yb = make_blobs(n_samples=300, centers=4, cluster_std=0.8, random_state=0)
+plt.scatter(Xb[:, 0], Xb[:, 1], c=yb, s=10)`, "donnees jouet blobs clusters simuler clustering kmeans");
 
   // ======================================================================================= NETWORKX
   L = "networkx"; C = "Construire un graphe";

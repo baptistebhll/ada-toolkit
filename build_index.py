@@ -98,7 +98,7 @@ def dotted(node):
 
 def _base_name(stem):
     """'Becoming a DataVizard exercise' / '..._solution' -> 'becomingadatavizard'"""
-    s = re.sub(r"(solution|exercise|exercice)", "", stem.lower())
+    s = re.sub(r"(solutions?|exercises?|exercices?)", "", stem.lower())
     return re.sub(r"[^a-z0-9]", "", s)
 
 

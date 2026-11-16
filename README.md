@@ -10,13 +10,21 @@ notebooks du cours, lecteur de notebooks, et recherche par mot-clé ou par phras
    python build_index.py
    ```
 2. (Re)générer les résultats des exemples après avoir modifié des fiches ou des recettes
-   (environnement conda `ada` : pandas, seaborn, statsmodels, scikit-learn, networkx) :
+   (environnement `.venv` à la racine d'`ADA 2026` : pandas, seaborn, statsmodels, scikit-learn, networkx).
+   Depuis le dossier `exam-tool`, dans Git Bash :
    ```
-   conda run -n ada python run_examples.py
+   ../.venv/Scripts/python.exe run_examples.py
    ```
+   (L'ancien env conda `ada` a un numpy cassé — MKL — qui fait planter les graphiques : ne plus l'utiliser.)
    Chaque exemple est exécuté sur les données fictives de `donnees_exemple.py` ; ses vraies sorties
    (valeurs, tableaux, graphiques) vont dans `examples.js` et `img/ex/`. Le script liste les exemples en erreur.
-3. Ouvrir `index.html` (double-clic) dans Chrome / Edge / Firefox. Pas besoin d'internet ni de serveur.
+3. (Re)générer la liste complète des paramètres de chaque fiche (lue dans la doc officielle des librairies
+   installées : types, valeurs possibles, défauts) :
+   ```
+   ../.venv/Scripts/python.exe extract_params.py
+   ```
+4. Avant de publier : `python bump_version.py` (ajoute `?v=…` aux fichiers pour éviter les vieux caches).
+5. Ouvrir `index.html` (double-clic) dans Chrome / Edge / Firefox. Pas besoin d'internet ni de serveur.
 
 Raccourcis : `/` ou `Ctrl+K` pour chercher, `↑` `↓` pour choisir un résultat, `Entrée` pour l'ouvrir, `Échap` pour effacer.
 
@@ -39,6 +47,8 @@ Raccourcis : `/` ou `Ctrl+K` pour chercher, `↑` `↓` pour choisir un résulta
 | `kb_functions.js` | Fiches de fonctions — **à enrichir toi-même** |
 | `kb_recipes.js` | Recettes — **à enrichir toi-même** |
 | `search.js` | Moteur de recherche + dictionnaire de synonymes (`SYN_GROUPS`) |
+| `donnees_exemple.py`, `run_examples.py` | Données fictives + exécution des exemples → `examples.js`, `img/ex/` |
+| `extract_params.py` | Tous les paramètres de chaque fonction (doc officielle) → `params.js` |
 | `app.js`, `style.css`, `index.html` | Interface |
 
 ## Ajouter du contenu

@@ -4,8 +4,8 @@ Exécute pour de vrai tous les exemples des fiches (kb_functions.js) et des rece
 sur les données fictives de donnees_exemple.py, et enregistre leurs sorties (texte, tableaux, graphiques).
 
 Usage (dans l'environnement qui a pandas, seaborn, statsmodels, sklearn, networkx) :
-    conda run -n ada python run_examples.py            # tout
-    conda run -n ada python run_examples.py groupby    # seulement ce qui contient "groupby" (débogage)
+    ../.venv/Scripts/python.exe run_examples.py            # tout
+    ../.venv/Scripts/python.exe run_examples.py groupby    # seulement ce qui contient "groupby" (débogage)
 
 Produit :
     examples.js   -> window.ADA_EX = {preamble, fn: {nom: sorties}, rec: {id: [sorties par étape]}}

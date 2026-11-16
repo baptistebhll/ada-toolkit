@@ -343,7 +343,7 @@ print(p)`]],
     [["", `from statsmodels.stats import diagnostic
 stat, p = diagnostic.kstest_normal(df['x'], dist='norm')    # ou dist='exp'
 stats.shapiro(df['x'].sample(100, random_state=0))
-stats.kstest(df['x'], 'norm', args=(df['x'].mean(), df['x'].std()))
+stats.kstest(df['x'], stats.norm(loc=df['x'].mean(), scale=df['x'].std()).cdf)
 stats.ks_2samp(a, b)     # deux échantillons ont-ils la même distribution ?`],
      ["QQ-plot.", `import statsmodels.api as sm
 sm.qqplot(df['x'], line='s')`]],
@@ -600,6 +600,41 @@ imp = pd.Series(rf.feature_importances_, index=X_train.columns).sort_values()
 imp.tail(15).plot(kind='barh')`]],
     ["L'importance ne dit pas le sens de l'effet ; elle est biaisée vers les variables avec beaucoup de valeurs."],
     ["sklearn.ensemble.RandomForestClassifier", "sklearn.tree.DecisionTreeClassifier", "model.feature_importances_"]);
+
+  R(C, "seuil", "Choisir le seuil de décision d'un classifieur",
+    "predict() utilise un seuil de 0.5 sur la probabilité ; le faire varier change précision et rappel.",
+    "seuil threshold decision probabilite precision rappel recall accuracy f1 compromis classes desequilibrees",
+    [["Faire varier le seuil sur les probabilités du jeu de test.",
+`from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+proba = model.predict_proba(X_test)[:, 1]
+seuils = np.linspace(0.05, 0.95, 19)
+scores = pd.DataFrame([{'seuil': t,
+                        'accuracy': accuracy_score(y_test, proba >= t),
+                        'precision': precision_score(y_test, proba >= t, zero_division=0),
+                        'recall': recall_score(y_test, proba >= t),
+                        'f1': f1_score(y_test, proba >= t)} for t in seuils]).set_index('seuil')
+scores.plot(marker='o'); plt.xlabel('Seuil'); plt.ylabel('Score')
+scores.round(2).head()`],
+     ["Prédire avec le seuil choisi.", `seuil = scores['f1'].idxmax()
+y_pred_seuil = (proba >= seuil).astype(int)
+seuil, f1_score(y_test, y_pred_seuil)`]],
+    ["Seuil bas : on attrape plus de positifs (rappel ↑) mais avec plus de faux positifs (précision ↓).",
+     "Classes déséquilibrées : l'accuracy est trompeuse, regarder précision / rappel / F1 ou l'AUC.",
+     "Choisir le seuil sur le train ou par validation croisée, pas sur le test, si on veut une évaluation honnête."],
+    ["model.predict_proba", "sklearn.metrics.precision_score", "sklearn.metrics.accuracy_score"]);
+
+  R(C, "coefficients", "Visualiser les coefficients d'un modèle (triés)",
+    "Quelles variables poussent la prédiction vers la classe positive ou négative ?",
+    "coefficients poids importance variables trier barres horizontales interpretation modele lineaire logistique",
+    [["", `X_dum = pd.get_dummies(df[['age', 'revenu', 'score', 'pays', 'sexe']], drop_first=True, dtype=int)
+X_dum = (X_dum - X_dum.mean()) / X_dum.std()          # standardiser pour comparer les coefficients
+clf_dum = LogisticRegression(max_iter=1000).fit(X_dum, df['achat'])
+coefs = pd.Series(clf_dum.coef_[0], index=X_dum.columns).sort_values()
+coefs.plot(kind='barh', color=np.where(coefs > 0, 'tab:green', 'tab:red'))
+plt.axvline(0, color='grey', lw=1); plt.xlabel('Coefficient (variables standardisées)')`]],
+    ["Coefficient positif : augmente la probabilité de la classe 1 ; négatif : la diminue.",
+     "Comparer des coefficients n'a de sens que si les variables sont sur la même échelle (standardisées)."],
+    ["model.coef_", "plt.barh", "pd.get_dummies"]);
 
   R(C, "knn", "k plus proches voisins",
     "Classifier selon les voisins les plus proches ; choisir k.",

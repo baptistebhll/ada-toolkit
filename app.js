@@ -6,6 +6,8 @@
   const KB = window.ADA_KB || { functions: [], recipes: [] };
   const S = window.AdaSearch;
   const EX = window.ADA_EX || { fn: {}, rec: {} }; // sorties réelles des exemples (run_examples.py)
+  const PARAMS = window.ADA_PARAMS || {}; // tous les paramètres de chaque fonction (extract_params.py)
+  const VERSIONS = PARAMS._versions || {};
   const $ = (s) => document.querySelector(s);
   const main = $("#main"), side = $("#side"), qInput = $("#q");
 
@@ -110,7 +112,7 @@
   KB.functions.forEach((k, idx) => {
     const key = kbKey(k.name);
     const f = FN[key] || (FN[key] = { key, cells: [], count: 0, short: key.split(".").pop() });
-    Object.assign(f, { display: kbDisplay(k.name), lib: k.lib, cat: k.cat, sig: k.sig, desc: k.d, ex: k.ex, tags: k.t || "", note: k.n || "", kb: true, kbIdx: idx, exOut: (EX.fn || {})[k.name] || [] });
+    Object.assign(f, { display: kbDisplay(k.name), lib: k.lib, cat: k.cat, sig: k.sig, desc: k.d, ex: k.ex, tags: k.t || "", note: k.n || "", kb: true, kbIdx: idx, exOut: (EX.fn || {})[k.name] || [], params: PARAMS[k.name] || null });
     if (!f.doc) f.doc = docUrl(key, f.lib, f.short);
   });
   // ordre : fiches dans l'ordre du fichier kb_functions.js, puis les fonctions vues seulement en série
@@ -147,7 +149,8 @@
     body: r.cat + " " + r.steps.map((s) => s[0]).join(" "), code: r.steps.map((s) => s[1]).join("\n") } }));
   FNS.forEach((f) => DOCS.push({ type: "fn", ref: f, f: {
     name: f.display + " " + f.key, tags: f.tags || "", desc: (f.desc || "") + " " + (f.note || ""),
-    body: (f.cat || "") + " " + libLabel(f.lib), code: (f.sig || "") + "\n" + (f.ex || "") } }));
+    body: (f.cat || "") + " " + libLabel(f.lib) + " " + (f.params ? f.params.params.map((p) => p.n).join(" ") : ""),
+    code: (f.sig || "") + "\n" + (f.ex || "") } }));
   D.cells.forEach((c) => DOCS.push({ type: "cell", ref: c, f: { title: c.section, body: c.ctx, code: c.code } }));
   const IX = S.createIndex(DOCS);
 
@@ -471,14 +474,41 @@
           ${f.doc ? `<a class="doc" href="${esc(f.doc)}" target="_blank" rel="noopener">Documentation officielle ↗</a>` : ""}
         </div>
       </div>
-      ${f.sig ? `<h2 class="sec">Signature</h2><pre class="code sig"><code>${highlight(f.sig)}</code></pre>` : ""}
+      ${f.sig ? `<h2 class="sec">Signature${f.params ? ` <button class="jump" data-target="params-sec">Tous les paramètres (${f.params.params.length}) ↓</button>` : ""}</h2>
+        <pre class="code sig"><code>${highlight(f.sig)}</code></pre>` : ""}
       ${f.note ? `<div class="note">💡 ${esc(f.note)}</div>` : ""}
       ${f.ex ? `<h2 class="sec">Exemple${f.exOut && f.exOut.length ? " et résultat" : ""}</h2>${dataNote()}${codeBlock(f.ex, null, f.exOut)}` : ""}
+      ${f.params ? paramsHtml(f) : ""}
       ${recs.length ? `<h2 class="sec">Recettes qui l'utilisent</h2><div class="chips">${recs.map(recChip).join("")}</div>` : ""}
       ${state.train ? "" : `<h2 class="sec">Dans tes notebooks <span class="cnt">${groups.length}</span></h2>
       ${groups.length ? cardsHtml(groups, { fn: f.short }) : noCourse()}`}
       ${rel.length ? `<h2 class="sec">Souvent utilisée avec (dans tes notebooks)</h2><div class="chips">${rel.map(([k, n]) => fnChip(k, `<span class="cnt">${n}</span>`)).join("")}</div>` : ""}
       ${sameCat.length ? `<h2 class="sec">Même catégorie : ${esc(f.cat)}</h2><div class="chips">${sameCat.map((g) => fnChip(g.key)).join("")}</div>` : ""}`;
+  }
+
+  /** Tableau de TOUS les paramètres (doc officielle) : nom, valeurs possibles, défaut, description. */
+  function paramsHtml(f) {
+    const P = f.params;
+    const lib = (P.src || "").split(".")[0].replace("sklearn", "scikit-learn");
+    const version = VERSIONS[lib] ? ` ${lib} ${VERSIONS[lib]}` : "";
+    const shown = 10;
+    const rows = P.params.map((p, i) => {
+      const desc = p.x || "";
+      const first = desc.split(/(?<=\.)\s|\n/)[0];
+      const rest = desc.length > first.length + 2;
+      const vals = p.v && p.v.length ? `<div class="pvals">${p.v.map((v) => `<code>${esc(v)}</code>`).join("")}</div>` : "";
+      return `<div class="prow${i >= shown ? " more-hidden" : ""}">
+        <div class="pname"><code>${esc(p.n)}</code>${p.d && p.d !== "None" ? `<span class="pdef">= <code>${esc(p.d)}</code></span>` : ""}</div>
+        <div class="pbody">${p.t ? `<div class="ptype">${esc(p.t)}</div>` : ""}${vals}
+          ${desc ? (rest ? `<details class="pdesc"><summary>${esc(first)}</summary><div>${esc(desc)}</div></details>` : `<div class="pdesc">${esc(desc)}</div>`) : ""}</div>
+      </div>`;
+    }).join("");
+    return `<section class="rgroup params-sec" id="params-sec"><h2 class="sec">Tous les paramètres <span class="cnt">${P.params.length}</span></h2>
+      <p class="data-note">Ce qu'on peut mettre entre les parenthèses de <code>${esc(f.display)}(…)</code> : valeurs possibles, défaut (<code>= …</code>), description.
+        Tiré de la doc officielle de <code>${esc(P.src)}</code>${version ? ` (version${esc(version)})` : ""}, en anglais — clique une ligne pour la description complète.</p>
+      ${P.sig ? `<details class="fullsig"><summary>Signature complète</summary><pre class="code sig"><code>${highlight(f.display + P.sig)}</code></pre></details>` : ""}
+      <div class="params">${rows}</div>
+      ${P.params.length > shown ? `<button class="more">Voir les ${P.params.length - shown} autres paramètres</button>` : ""}</section>`;
   }
 
   function relatedCells(r) {
@@ -784,6 +814,7 @@
       el.remove();
     } else if (el.id === "reset-filters") setFilters("all", "all");
     else if (el.id === "train-off") setTrain(false);
+    else if (el.classList.contains("jump")) document.getElementById(el.dataset.target)?.scrollIntoView({ block: "start", behavior: "smooth" });
     else if (el.dataset.q !== undefined) setQuery(el.dataset.q);
   });
 
