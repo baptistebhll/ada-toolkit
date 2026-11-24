@@ -71,6 +71,7 @@
     open: store.get("open2", {}),
     tab: store.get("tab", "recettes"),
     train: store.get("train", false), // mode entraînement : tout ce qui vient des séries est masqué
+    revise: store.get("revise", false), // mode révision : le code des recettes / du guide est caché jusqu'au clic
     route: { type: "home" },
     sel: 0,
     toc: [],
@@ -145,6 +146,12 @@
   const REC = Object.fromEntries(RECIPES.map((r) => [r.id, r]));
   const RCATS = [...new Set(RECIPES.map((r) => r.cat))];
   const recipesUsing = (key) => RECIPES.filter((r) => r.keys.includes(key));
+  // guide d'interprétation
+  const GUIDE = KB.guide || [];
+  const GUI = Object.fromEntries(GUIDE.map((g) => [g.id, g]));
+  const GCATS = [...new Set(GUIDE.map((g) => g.cat))];
+  const guideFor = (recId) => GUIDE.filter((g) => (g.recs || []).includes(recId));
+  const guideHref = (id) => "#g=" + enc(id);
 
   D.cells.forEach((c, i) => { c.id = i; c._code = c.code.toLowerCase(); });
   const chapters = [...new Set(D.notebooks.map((n) => n.chapter))].sort();
@@ -169,6 +176,9 @@
     body: (f.cat || "") + " " + libLabel(f.lib) + " " + (f.params ? f.params.params.map((p) => p.n).join(" ") : ""),
     code: (f.sig || "") + "\n" + (f.ex || "") } }));
   D.cells.forEach((c) => DOCS.push({ type: "cell", ref: c, f: { title: c.section, body: c.ctx, code: c.code } }));
+  GUIDE.forEach((g) => DOCS.push({ type: "guide", ref: g, f: {
+    title: g.title + " interpreter interpretation", tags: g.t, desc: g.intro + " " + g.phrase + " " + (g.pieges || []).join(" "),
+    body: g.cat + " " + (g.lecture || []).map((l) => l.join(" ")).join(" "), code: g.code || "" } }));
   const IX = S.createIndex(DOCS);
 
   function runSearch(q) {
@@ -176,7 +186,7 @@
     return S.search(IX, q, {
       // en mode entraînement : ni cellules des séries, ni fonctions qui n'existent que via les séries
       accept: (d) => (d.type === "cell" ? cellVisible(d.ref) : !(state.train && d.type === "fn" && !d.ref.kb)),
-      prior: (d) => (d.type === "recipe" ? 1.25 : d.type === "fn" ? (d.ref.kb ? 1.15 : 0.85) : 0.7),
+      prior: (d) => (d.type === "recipe" || d.type === "guide" ? 1.25 : d.type === "fn" ? (d.ref.kb ? 1.15 : 0.85) : 0.7),
       exact: (d) => d.type === "fn" && [d.ref.display, d.ref.short, d.ref.key].some((x) => norm(x) === nq),
     });
   }
@@ -340,6 +350,12 @@
   const codeBlock = (code, title, outs) => `<div class="card code-card">${title ? `<header class="card-head"><span class="crumb">${title}</span>${copyBtn(code)}</header>` : ""}
     <div class="code-wrap">${title ? "" : copyBtn(code)}<pre class="code"><code>${highlight(code)}</code></pre></div>
     ${outs && outs.length ? outputsHtml(outs, { open: true, keepOrder: true, label: "Résultat" }) : ""}</div>`;
+  /** mode révision : le contenu est caché derrière un bouton, pour essayer d'abord soi-même */
+  const revealable = (html, label = "Voir la solution", hint = "Essaie d'abord d'écrire le code toi-même.") => (state.revise
+    ? `<div class="reveal"><div class="reveal-hint">✍️ ${hint}</div><button class="reveal-btn">👀 ${label}</button><div class="reveal-body" hidden>${html}</div></div>`
+    : html);
+  const reviseToggle = () => `<button class="chip revise-toggle${state.revise ? " on" : ""}" id="revise-toggle"
+      title="Cacher le code et les conclusions pour s'entraîner à les écrire d'abord">${state.revise ? "✍️ Mode révision activé — tout afficher" : "✍️ Mode révision : cacher les solutions"}</button>`;
   const dataNote = () => (EX.preamble ? `<p class="data-note">Exécuté sur un petit jeu de données fictif (<code>df</code>, <code>X</code>, <code>y</code>, <code>res</code>…) — <a href="#donnees">voir les données d'exemple</a></p>` : "");
 
   function courseCard(g, opt = {}, hidden = false) {
@@ -392,6 +408,9 @@
       <h2 class="sec">Essaie une phrase ou un mot-clé</h2>
       <div class="chips">${EXAMPLES.map((t) => `<button class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       ${EX.preamble ? `<p class="data-note">Tous les exemples sont exécutés pour de vrai, avec leur résultat (tableau, valeurs, graphique), sur un petit jeu de données fictif — <a href="#donnees">voir les données d'exemple</a>.</p>` : ""}
+      <h2 class="sec">Interpréter et rédiger</h2>
+      <div class="chips"><a class="chip" href="#guide">🧭 Guide d'interprétation (${GUIDE.length} fiches)</a>
+        <a class="chip" href="#pieges">⚠️ Tous les pièges</a>${reviseToggle()}</div>
       <h2 class="sec">Le déroulé d'une analyse — recettes</h2>
       <div class="pipeline">${pipeline}</div>
       <h2 class="sec">Librairies</h2>
@@ -412,6 +431,7 @@
     const best = results.length ? results[0].score : 0;
     const keep = (type, ratio) => results.filter((r) => r.doc.type === type && r.score >= ratio * best);
     const recs = keep("recipe", 0.08).slice(0, 15);
+    const guides = keep("guide", 0.12).slice(0, 10);
     const fns = keep("fn", 0.08).slice(0, 30);
     // notebooks : comparés entre eux (pas aux recettes) + doivent couvrir l'essentiel de la requête
     const allCells = results.filter((r) => r.doc.type === "cell" && r.cov >= 0.6);
@@ -455,11 +475,19 @@
     const group = (title, n, shown, html, extra = "") => (n ? `<section class="rgroup"><h2 class="sec">${title} <span class="cnt">${n}</span></h2>
       <div class="hits">${html}</div>${n > shown ? `<button class="more">Voir ${n - shown} de plus</button>` : ""}${extra}</section>` : "");
     // ordre : recettes d'abord pour une phrase ; fonctions d'abord si on a tapé un nom de fonction exact
+    const guideHits = guides.map((r, i) => `<a class="hit${i >= 3 ? " more-hidden" : ""}" href="${guideHref(r.doc.ref.id)}">
+        <div class="hit-title">🧭 ${S.markText(r.doc.ref.title, terms)}</div>
+        <div class="hit-meta">Guide d'interprétation · ${esc(r.doc.ref.cat)}</div>
+        <div class="hit-snip">${S.snippet(r.doc.ref.intro, terms)}</div></a>`).join("");
     const gRec = group("Recettes", recs.length, 4, recHits);
+    const gGuide = group("Guide d'interprétation", guides.length, 3, guideHits);
     const gFn = group("Fonctions", fns.length, 6, fnHits);
     const gCell = group("Dans tes notebooks (cours, solutions, exos)", cellGroups.length, 5, cellHits);
     const fnFirst = exactFn || (fns.length && (!recs.length || fns[0].score > 1.5 * recs[0].score));
-    const groups = (fnFirst ? [gFn, gRec, gCell] : [gRec, gFn, gCell]).join("");
+    // le guide passe devant les recettes quand la question porte sur l'interprétation
+    const guideFirst = guides.length && (!recs.length || guides[0].score > recs[0].score);
+    const textGroups = guideFirst ? [gGuide, gRec] : [gRec, gGuide];
+    const groups = (fnFirst ? [gFn, ...textGroups, gCell] : [...textGroups, gFn, gCell]).join("");
 
     const words = A.concepts.map((c) => c.w).join(", ");
     return `<div class="fhead"><div class="crumbs">Recherche</div><h1>« ${esc(q)} »</h1>
@@ -546,19 +574,68 @@
     const same = RECIPES.filter((x) => x.cat === r.cat && x.id !== r.id);
     const groups = relatedCells(r);
     const outs = (EX.rec && EX.rec[r.id]) || [];
-    const steps = r.steps.map(([txt, code], k) => `<div class="step">${txt ? `<p>${inline(txt)}</p>` : ""}${code ? codeBlock(code, null, outs[k]) : ""}</div>`).join("");
+    const steps = r.steps.map(([txt, code], k) => `<div class="step">${txt ? `<p>${inline(txt)}</p>` : ""}${code ? revealable(codeBlock(code, null, outs[k])) : ""}</div>`).join("");
+    const gl = guideFor(r.id);
     return `<div class="fhead">
         <div class="crumbs"><a href="#recettes">Recettes</a> › ${esc(r.cat)}</div>
         <h1>${esc(r.title)}</h1>
         <p class="desc">${esc(r.intro)}</p>
         ${dataNote()}
+        <div class="head-actions">${reviseToggle()}</div>
       </div>
       <div class="steps">${steps}</div>
       ${r.tips && r.tips.length ? `<div class="note"><b>À retenir</b><ul>${r.tips.map((t) => `<li>${inline(t)}</li>`).join("")}</ul></div>` : ""}
+      ${gl.length ? `<h2 class="sec">Interpréter le résultat</h2><div class="chips">${gl.map((g) => `<a class="chip" href="${guideHref(g.id)}">🧭 ${esc(g.title)}</a>`).join("")}</div>` : ""}
       ${r.keys.length ? `<h2 class="sec">Fonctions utilisées</h2><div class="chips">${r.keys.map((k) => fnChip(k)).join("")}</div>` : ""}
       ${state.train ? "" : `<h2 class="sec">Vu dans tes notebooks <span class="cnt">${groups.length}</span></h2>
       ${groups.length ? cardsHtml(groups, {}, 2) : noCourse()}`}
       ${same.length ? `<h2 class="sec">Autres recettes : ${esc(r.cat)}</h2><div class="chips">${same.map(recChip).join("")}</div>` : ""}`;
+  }
+
+  // ================================================================== guide d'interprétation
+  function viewGuide(id) {
+    const g = GUI[id];
+    if (!g) return `<div class="empty">Fiche du guide inconnue.</div>`;
+    const outs = (EX.guide && EX.guide[g.id]) || [];
+    const same = GUIDE.filter((x) => x.cat === g.cat && x.id !== g.id);
+    const recs = (g.recs || []).map((rid) => REC[rid]).filter(Boolean);
+    const lecture = (g.lecture || []).map(([k, v]) => `<div class="lrow"><div class="lkey">${inline(k)}</div><div class="lval">${inline(v)}</div></div>`).join("");
+    const phrase = `<blockquote class="phrase">${inline(g.phrase)}</blockquote>`;
+    return `<div class="fhead">
+        <div class="crumbs"><a href="#guide">Guide d'interprétation</a> › ${esc(g.cat)}</div>
+        <h1>${esc(g.title)}</h1>
+        <p class="desc">${esc(g.intro)}</p>
+        <div class="head-actions">${reviseToggle()}</div>
+      </div>
+      ${g.code ? `<h2 class="sec">Exemple et résultat</h2>${dataNote()}${revealable(codeBlock(g.code, null, outs))}` : ""}
+      ${lecture ? `<h2 class="sec">Comment lire</h2><div class="lecture">${lecture}</div>` : ""}
+      <h2 class="sec">Phrase type pour la réponse</h2>
+      ${revealable(phrase, "Voir la phrase type", "Essaie d'abord de rédiger ta conclusion en une ou deux phrases.")}
+      ${g.pieges && g.pieges.length ? `<div class="note"><b>⚠️ Pièges</b><ul>${g.pieges.map((t) => `<li>${inline(t)}</li>`).join("")}</ul></div>` : ""}
+      ${recs.length ? `<h2 class="sec">Recettes liées</h2><div class="chips">${recs.map(recChip).join("")}</div>` : ""}
+      ${same.length ? `<h2 class="sec">Aussi dans « ${esc(g.cat)} »</h2><div class="chips">${same.map((x) => `<a class="chip" href="${guideHref(x.id)}">🧭 ${esc(x.title)}</a>`).join("")}</div>` : ""}`;
+  }
+
+  function viewGuides() {
+    return `<div class="fhead"><div class="crumbs">Guide</div><h1>Guide d'interprétation</h1>
+      <p class="sub">Comment lire chaque résultat et quoi écrire dans ta réponse — avec des phrases types générées sur de vrais résultats.</p>
+      <div class="head-actions">${reviseToggle()} <a class="chip" href="#pieges">⚠️ Tous les pièges</a></div></div>
+      ${GCATS.map((cat) => `<h2 class="sec">${esc(cat)}</h2><div class="hits">${GUIDE.filter((g) => g.cat === cat).map((g) =>
+        `<a class="hit" href="${guideHref(g.id)}"><div class="hit-title">🧭 ${esc(g.title)}</div><div class="hit-snip">${esc(g.intro)}</div></a>`).join("")}</div>`).join("")}`;
+  }
+
+  // ================================================================== page pièges
+  function viewPieges() {
+    const sec = (title, items) => (items.length ? `<h2 class="sec">${title} <span class="cnt">${items.length}</span></h2>
+      <div class="pieges">${items.map(([src, href, txt]) => `<div class="piege"><a href="${href}">${esc(src)}</a><div>${inline(txt)}</div></div>`).join("")}</div>` : "");
+    const fromGuide = GUIDE.flatMap((g) => (g.pieges || []).map((p) => [g.title, guideHref(g.id), p]));
+    const fromRec = RECIPES.flatMap((r) => (r.tips || []).map((p) => [r.title, recHref(r.id), p]));
+    const fromFn = LIB_ORDER.flatMap((lib) => FNS.filter((f) => f.kb && f.lib === lib && f.note).map((f) => [f.display, fnHref(f.key), f.note]));
+    const total = fromGuide.length + fromRec.length + fromFn.length;
+    return `<div class="fhead"><div class="crumbs">Révision</div><h1>⚠️ Tous les pièges</h1>
+      <p class="sub">${total} pièges et points d'attention réunis : guide d'interprétation, recettes (« À retenir ») et fiches de fonctions (💡). À relire la veille de l'examen.</p>
+      <input class="pieges-filter" id="pieges-filter" type="search" placeholder="Filtrer (ex. p-value, merge, NaN, standardiser…)"></div>
+      ${sec("Interprétation", fromGuide)}${sec("Recettes", fromRec)}${sec("Fonctions", fromFn)}`;
   }
 
   function viewRecipes() {
@@ -644,9 +721,10 @@
   }
 
   // ================================================================== barre latérale
-  const ALL_TABS = [["recettes", "Recettes"], ["libs", "Librairies"], ["nbs", "Notebooks"]];
+  const ALL_TABS = [["recettes", "Recettes"], ["guide", "Guide"], ["libs", "Librairies"], ["nbs", "Notebooks"]];
   function sideTabFor(route) {
     if (route.type === "recipe" || route.type === "recipes") return "recettes";
+    if (route.type === "guide" || route.type === "guides" || route.type === "pieges") return "guide";
     if (route.type === "fn" || route.type === "lib") return "libs";
     if (route.type === "nb" || route.type === "notebooks") return state.train ? "recettes" : "nbs";
     return state.train && state.tab === "nbs" ? "recettes" : state.tab;
@@ -655,13 +733,18 @@
 
   function renderSide() {
     const r = state.route;
-    const TABS = state.train ? ALL_TABS.slice(0, 2) : ALL_TABS;
+    const TABS = state.train ? ALL_TABS.filter(([k]) => k !== "nbs") : ALL_TABS;
     const tabs = `<div class="side-tabs">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${state.tab === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
     let body = "";
     if (state.tab === "recettes") {
       body = RCATS.map((cat) => `<details data-k="r:${esc(cat)}"${isOpen("r:" + cat, true) ? " open" : ""}>
         <summary>${esc(cat)}</summary><ul>${RECIPES.filter((x) => x.cat === cat).map((x) =>
           `<li><a href="${recHref(x.id)}" class="${r.type === "recipe" && r.id === x.id ? "active" : ""}">${esc(x.title)}</a></li>`).join("")}</ul></details>`).join("");
+    } else if (state.tab === "guide") {
+      body = `<ul><li><a class="overview${r.type === "pieges" ? " active" : ""}" href="#pieges">⚠️ Tous les pièges →</a></li></ul>` +
+        GCATS.map((cat) => `<details data-k="g:${esc(cat)}"${isOpen("g:" + cat, true) ? " open" : ""}>
+        <summary>${esc(cat)}</summary><ul>${GUIDE.filter((x) => x.cat === cat).map((x) =>
+          `<li><a href="${guideHref(x.id)}" class="${r.type === "guide" && r.id === x.id ? "active" : ""}">${esc(x.title)}</a></li>`).join("")}</ul></details>`).join("");
     } else if (state.tab === "libs") {
       const curLib = r.type === "fn" && FN[r.key] ? FN[r.key].lib : r.type === "lib" ? r.lib : null;
       body = LIB_ORDER.map((lib) => {
@@ -700,6 +783,9 @@
     if (p.has("recettes")) return { type: "recipes" };
     if (p.has("notebooks")) return { type: "notebooks" };
     if (p.has("donnees")) return { type: "donnees" };
+    if (p.has("g")) return { type: "guide", id: p.get("g") };
+    if (p.has("guide")) return { type: "guides" };
+    if (p.has("pieges")) return { type: "pieges" };
     return { type: "home" };
   }
 
@@ -716,6 +802,9 @@
       case "nb": html = state.train ? trainBlocked() : viewNotebook(r.nb); title = D.notebooks[r.nb] ? D.notebooks[r.nb].title : title; break;
       case "notebooks": html = state.train ? trainBlocked() : viewNotebooks(); title = "Notebooks"; break;
       case "donnees": html = viewDonnees(); title = "Données d'exemple"; break;
+      case "guide": html = viewGuide(r.id); title = GUI[r.id] ? GUI[r.id].title : title; break;
+      case "guides": html = viewGuides(); title = "Guide d'interprétation"; break;
+      case "pieges": html = viewPieges(); title = "Pièges"; break;
       case "code": html = state.train ? trainBlocked() : viewCode(r.text); break;
       default: html = viewHome();
     }
@@ -747,6 +836,13 @@
 
   // ================================================================== recherche (saisie)
   let typingTimer;
+  // filtre de la page « Pièges »
+  main.addEventListener("input", (e) => {
+    if (e.target.id !== "pieges-filter") return;
+    const t = norm(e.target.value).trim();
+    main.querySelectorAll(".piege").forEach((p) => { p.hidden = t && !norm(p.textContent).includes(t); });
+  });
+
   qInput.addEventListener("input", () => {
     clearTimeout(typingTimer);
     typingTimer = setTimeout(() => {
@@ -833,6 +929,16 @@
     } else if (el.id === "reset-filters") setFilters("all", "all");
     else if (el.id === "train-off") setTrain(false);
     else if (el.classList.contains("jump")) document.getElementById(el.dataset.target)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    else if (el.classList.contains("reveal-btn")) {
+      const box = el.closest(".reveal");
+      box.querySelector(".reveal-body").hidden = false;
+      box.querySelector(".reveal-hint")?.remove();
+      el.remove();
+    } else if (el.id === "revise-toggle") {
+      state.revise = !state.revise;
+      store.set("revise", state.revise);
+      render(true);
+    }
     else if (el.dataset.q !== undefined) setQuery(el.dataset.q);
   });
 

@@ -219,6 +219,27 @@ pre.out-text.err { color: #cf222e; }
 .jump:hover { border-color: var(--accent); }
 @media (max-width: 860px) { .prow { grid-template-columns: 1fr; gap: 4px; } }
 
+/* guide d'interprétation */
+.lecture { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); overflow: hidden; }
+.lrow { display: grid; grid-template-columns: minmax(140px, 230px) 1fr; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 13.5px; }
+.lrow:first-child { border-top: 0; }
+.lkey { font-weight: 700; font-family: "Cascadia Code", Consolas, monospace; font-size: 12.8px; word-break: break-word; }
+.phrase { margin: 0; padding: 12px 16px; border-left: 4px solid var(--sol); background: var(--sol-bg); border-radius: 8px; font-size: 14.5px; line-height: 1.55; }
+.head-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.revise-toggle.on { background: var(--exo-bg); border-color: var(--exo); color: var(--text); font-weight: 600; }
+.reveal { border: 1px dashed var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; background: var(--panel); }
+.reveal-hint { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+.reveal-btn { border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
+.reveal-body > .card { margin: 0; }
+/* page pièges */
+.pieges-filter { width: 100%; max-width: 480px; margin-top: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; }
+.pieges { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); overflow: hidden; }
+.piege { display: grid; grid-template-columns: minmax(150px, 260px) 1fr; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 13.5px; }
+.piege:first-child { border-top: 0; }
+.piege[hidden] { display: none; }
+.piege > a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 12.8px; }
+@media (max-width: 860px) { .lrow, .piege { grid-template-columns: 1fr; gap: 2px; } }
+
 /* mode entraînement */
 .train-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--muted); white-space: nowrap; user-select: none; }
 .train-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }

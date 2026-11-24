@@ -199,6 +199,9 @@ window.AdaSearch = (() => {
     personnage personnages character characters speaker auteur
     replique repliques dialogue line lines
     parser parsing lire extraire
+    interpreter interpretation signifie comprendre lire veut dire
+    rediger conclusion conclure ecrire reponse phrase
+    piege pieges erreur erreurs attention
   `.trim().split("\n").map((l) => l.trim().split(/\s+/).map((w) => stem(norm(w))));
   const SYN = new Map();
   for (const g of SYN_GROUPS) for (const w of g) {

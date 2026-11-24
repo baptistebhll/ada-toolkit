@@ -49,6 +49,7 @@ Raccourcis : `/` ou `Ctrl+K` pour chercher, `↑` `↓` pour choisir un résulta
 | `build_index.py` | Lit les `.ipynb` → `data.js` + `img/` (généré, ne pas modifier à la main) |
 | `kb_functions.js` | Fiches de fonctions — **à enrichir toi-même** |
 | `kb_recipes.js` | Recettes — **à enrichir toi-même** |
+| `kb_interpret.js` | Guide d'interprétation (comment lire un résultat, phrase type, pièges) ; son code est exécuté par `run_examples.py` |
 | `search.js` | Moteur de recherche + dictionnaire de synonymes (`SYN_GROUPS`) |
 | `donnees_exemple.py`, `run_examples.py` | Données fictives + exécution des exemples → `examples.js`, `img/ex/` |
 | `extract_params.py` | Tous les paramètres de chaque fonction (doc officielle) → `params.js` |

@@ -337,13 +337,24 @@ def main():
                 errors.append(f"[recette] {rid} étape {k + 1}: {err}")
         result["rec"][rid] = step_outs
 
+    # guide d'interprétation : chaque fiche est indépendante
+    result["guide"] = {}
+    for args in js_calls(TOOL / "kb_interpret.js", "G"):
+        gid, code = args[1], args[5]
+        if not code.strip() or (ONLY and ONLY not in gid and ONLY not in code):
+            continue
+        outs, err = run_code(code, fresh(base))
+        result["guide"][gid] = outs
+        if err:
+            errors.append(f"[guide] {gid}: {err}")
+
     os.chdir(old_cwd)
     shutil.rmtree(work, ignore_errors=True)
     js = "window.ADA_EX = " + json.dumps(result, ensure_ascii=False, separators=(",", ":")) + ";\n"
     if not ONLY:
         (TOOL / "examples.js").write_text(js, encoding="utf-8")
     n_img = len(list(IMG.glob("*.png")))
-    print(f"{len(result['fn'])} fiches, {len(result['rec'])} recettes, {n_img} graphiques, "
+    print(f"{len(result['fn'])} fiches, {len(result['rec'])} recettes, {len(result['guide'])} fiches guide, {n_img} graphiques, "
           f"{len(errors)} erreurs, {time.time() - t0:.0f} s -> examples.js ({len(js) / 1e6:.1f} Mo)")
     for e in errors:
         print("  ✗", e)
