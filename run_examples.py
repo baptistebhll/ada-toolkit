@@ -281,6 +281,12 @@ def make_data_files(base):
         d.to_json(f"data/{stem}.jsonl", orient="records", lines=True, date_format="iso")
         d.to_excel(f"data/{stem}.xlsx", sheet_name="Feuil1", index=False)
     d.to_pickle("data/df.pkl")
+    Path("data/script.txt").write_text(base["script_brut"], encoding="utf-8")
+    os.makedirs("data/livres", exist_ok=True)
+    full = base["df"]
+    for sujet in sorted(full["sujet"].unique()):
+        txt = ". ".join(full.loc[full["sujet"] == sujet, "texte"]) + "."
+        Path(f"data/livres/{sujet}.txt").write_text(txt, encoding="utf-8")
 
 
 def main():

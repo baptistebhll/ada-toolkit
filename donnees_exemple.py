@@ -131,6 +131,62 @@ X_s = StandardScaler().fit_transform(X)
 km = KMeans(n_clusters=4, n_init=10, random_state=0).fit(X_s)
 labels = km.labels_
 
+# ---------------------------------------------------------------- texte : un script de série fictif
+# Même format que l'exercice « Handling text 2 » : '>>' = nouvel épisode, '>' = nouvelle scène, 'Nom: réplique'.
+common = 'i you we the a is are was to of and it that this what so well really just think know'.split()
+vocab = {'Alice': 'physics theory quantum obviously fascinating hypothesis experiment universe equation'.split(),
+         'Bob': 'work office meeting boss coffee deadline project report tired'.split(),
+         'Chloe': 'restaurant shift customers acting audition rent wine friends party'.split(),
+         'David': 'engineer space mother rocket design prototype mars launch'.split(),
+         'Emma': 'biology cells lab microscope research science mice samples'.split()}
+positifs, negatifs = 'great wonderful love happy amazing'.split(), 'terrible awful hate sad horrible'.split()
+
+
+def replique(perso):
+    autre = vocab[rng.choice(list(vocab))]                     # un mot « emprunté » à quelqu'un d'autre
+    mots = list(rng.choice(common, 4)) + list(rng.choice(vocab.get(perso, common), 2)) + [rng.choice(autre)]
+    if rng.random() < 0.4:
+        mots.append(rng.choice(positifs if rng.random() < 0.5 else negatifs))
+    rng.shuffle(mots)
+    return ' '.join(mots).capitalize() + rng.choice(['.', '!', '?', ', right?'])
+
+
+lignes = []
+for saison in range(1, 5):
+    for ep in range(1, 4):
+        lignes.append(f'>> Season {saison} Episode {ep}')
+        for sc in ['Living room', 'Office']:
+            lignes.append(f'> Scene: {sc}')
+            for _ in range(8):
+                p = rng.choice(list(vocab), p=[.35, .2, .2, .15, .1])
+                lignes.append(f'{p}: {replique(p)}')
+            if rng.random() < 0.3:
+                lignes.append('All: Cheers!')                      # réplique à plusieurs : à écarter
+        if ep == 2:
+            lignes.append(f'Waiter{saison}: Here is your order.')   # personnage d'un seul épisode
+script_brut = '\n'.join(lignes)
+
+rows, episode, scene = [], None, None
+for l in script_brut.splitlines():
+    if l.startswith('>>'):
+        episode = l[2:].strip()
+    elif l.startswith('>'):
+        scene = l[1:].strip()
+    elif ':' in l:
+        perso, ligne = l.split(':', 1)
+        rows.append({'episode': episode, 'scene': scene, 'personnage': perso.strip(), 'ligne': ligne.strip()})
+script = pd.DataFrame(rows)
+script['saison'] = script['episode'].str.extract(r'Season (\d+)', expand=False).astype(int)
+
+# un court texte en prose (anglais, pour spaCy / VADER / Empath)
+livre = ("Ada Lovelace wrote the first published algorithm in London in 1843. "
+         "She worked with Charles Babbage on his Analytical Engine, a wonderful machine that was never finished. "
+         "Many people thought the idea was absurd and the project was a terrible waste of money. "
+         "Today, students at EPFL in Lausanne learn about her work and love her bold vision. "
+         "The old engine was cold and silent, but her notes were full of hope and joy. "
+         "Sadly, she died young, and her pain and illness marked her last years.")
+corpus_docs = df['texte'].str.split().tolist()   # 200 petits documents (3 sujets : sport, tech, santé)
+
 # ---------------------------------------------------------------- graphe (20 nœuds 'a'...'t')
 G = nx.connected_watts_strogatz_graph(20, 4, 0.3, seed=0)
 G = nx.relabel_nodes(G, dict(enumerate('abcdefghijklmnopqrst')))

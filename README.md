@@ -16,6 +16,9 @@ notebooks du cours, lecteur de notebooks, et recherche par mot-clé ou par phras
    ../.venv/Scripts/python.exe run_examples.py
    ```
    (L'ancien env conda `ada` a un numpy cassé — MKL — qui fait planter les graphiques : ne plus l'utiliser.)
+   Pour les exemples « Texte (NLP) », le `.venv` contient aussi spaCy, VADER, gensim, nltk et Empath :
+   `../.venv/Scripts/python.exe -m pip install spacy vaderSentiment gensim nltk empath`
+   puis `../.venv/Scripts/python.exe -m spacy download en_core_web_sm`.
    Chaque exemple est exécuté sur les données fictives de `donnees_exemple.py` ; ses vraies sorties
    (valeurs, tableaux, graphiques) vont dans `examples.js` et `img/ex/`. Le script liste les exemples en erreur.
 3. (Re)générer la liste complète des paramètres de chaque fiche (lue dans la doc officielle des librairies

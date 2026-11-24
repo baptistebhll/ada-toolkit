@@ -188,6 +188,17 @@ window.AdaSearch = (() => {
     titre title
     tableau croise pivot
     erreur standard sem
+    sentiment polarite emotion opinion vader
+    theme themes topic topics lda sujet
+    entite entites entity ner
+    lemme lemmes lemmatisation lemma lemmatization
+    token tokens tokenisation tokenization tokenizer
+    phrase phrases sentence sentences sents
+    stopword stopwords stop
+    corpus livres documents books
+    personnage personnages character characters speaker auteur
+    replique repliques dialogue line lines
+    parser parsing lire extraire
   `.trim().split("\n").map((l) => l.trim().split(/\s+/).map((w) => stem(norm(w))));
   const SYN = new Map();
   for (const g of SYN_GROUPS) for (const w of g) {

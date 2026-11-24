@@ -731,6 +731,180 @@ Counter(' '.join(df['texte']).lower().split()).most_common(20)`]],
     ["Retirer les mots vides (stop words) pour un résultat utile."],
     ["s.str", "s.value_counts", "df.explode"]);
 
+  R(C, "texte-parser", "Transformer un fichier texte structuré en DataFrame",
+    "Ex. un script de série : '>>' = épisode, '>' = scène, 'Nom: réplique'. On lit ligne par ligne en retenant l'épisode et la scène courants.",
+    "parser script lire fichier texte structure lignes dialogue episode scene personnage dataframe extraire examen",
+    [["Lecture ligne par ligne, avec l'état courant (épisode, scène).",
+`rows, episode, scene = [], None, None
+with open('data/script.txt', encoding='utf-8') as f:
+    for l in f:
+        l = l.strip()
+        if l.startswith('>>'):
+            episode = l[2:].strip()
+        elif l.startswith('>'):
+            scene = l[1:].strip()
+        elif ':' in l:
+            perso, ligne = l.split(':', 1)          # maxsplit=1 : la réplique peut contenir ':'
+            rows.append({'episode': episode, 'scene': scene, 'personnage': perso.strip(), 'ligne': ligne.strip()})
+dlg = pd.DataFrame(rows)
+dlg['saison'] = dlg['episode'].str.extract(r'Season (\\d+)', expand=False).astype(int)
+dlg.head()`],
+     ["Écarter les répliques dites à plusieurs, garder les personnages récurrents (présents dans plus d'un épisode).",
+`dlg = dlg[~dlg['personnage'].isin(['All', 'Together'])]
+n_episodes = dlg.groupby('personnage')['episode'].nunique()
+recurrents = n_episodes[n_episodes > 1].index
+dlg['personnage'].value_counts().loc[lambda s: s.index.isin(recurrents)]`]],
+    ["Vérifier le résultat : nombre d'épisodes, de lignes, personnages bizarres (ex. 'Man', 'Both').",
+     "str.split(':', 1) et pas split(':') : sinon une réplique contenant ':' casse tout."],
+    ["s.str", "df.groupby", "s.nunique", "s.isin"]);
+
+  R(C, "texte-tokens", "Nettoyer le texte et le découper en mots",
+    "Minuscules, ponctuation remplacée par des espaces, puis une ligne par mot (pour compter).",
+    "nettoyer texte ponctuation minuscules mots tokens decouper split explode compter preparer",
+    [["", `import string
+table = str.maketrans(string.punctuation, ' ' * len(string.punctuation))
+script['propre'] = script['ligne'].str.translate(table).str.lower()
+script['mots'] = script['propre'].str.split()
+script['n_mots'] = script['mots'].str.len()
+mots = script[['personnage', 'mots']].explode('mots')      # une ligne par mot
+mots.head()`]],
+    ["Remplacer la ponctuation par un espace (et pas par rien) évite de coller deux mots ('end.Start' → 'end start').",
+     "Avec spaCy : lemmes + retirer stop words et ponctuation (recette « Pipeline NLP avec spaCy »)."],
+    ["string.punctuation", "s.str", "df.explode"]);
+
+  R(C, "texte-zipf", "Fréquence des mots d'un corpus et sa distribution (loi de Zipf)",
+    "Combien de fois chaque mot apparaît dans tout le corpus, et quelle forme a cette distribution ?",
+    "frequence corpus mots occurrences distribution zipf queue lourde log log histogramme corpus frequency",
+    [["", `import string
+table = str.maketrans(string.punctuation, ' ' * len(string.punctuation))
+mots = script['ligne'].str.translate(table).str.lower().str.split().explode()
+freq = mots.value_counts()          # « corpus frequency » de chaque mot
+print(freq.head(8))
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.5))
+axes[0].hist(freq, bins=30); axes[0].set(title='Échelle linéaire', xlabel='Fréquence', ylabel='Nb de mots')
+axes[1].hist(freq, bins=np.logspace(0, np.log10(freq.max()), 20)); axes[1].set(xscale='log', yscale='log', title='Échelle log-log')
+plt.tight_layout()`]],
+    ["Distribution à queue lourde : beaucoup de mots rares, quelques mots très fréquents (« the », « you »…) → axes log-log.",
+     "Le rang × la fréquence est à peu près constant (loi de Zipf)."],
+    ["s.value_counts", "plt.hist", "np.logspace", "plt.xscale"]);
+
+  R(C, "texte-par-personne", "Qui parle le plus ? (mots ou répliques par personne)",
+    "Agréger le nombre de mots par personnage / auteur.",
+    "parle le plus talkativity nombre de mots par personnage auteur bavard agreger repliques",
+    [["", `script['n_mots'] = script['ligne'].str.split().str.len()
+par_perso = (script.groupby('personnage')
+                   .agg(repliques=('ligne', 'size'), mots=('n_mots', 'sum'), mots_par_replique=('n_mots', 'mean'))
+                   .sort_values('mots', ascending=False))
+par_perso.head(6)`]],
+    ["« Le plus bavard » dépend de la définition : total de mots, nombre de répliques, ou mots par réplique. Le préciser."],
+    ["df.groupby", "df.agg", "df.sort_values"]);
+
+  R(C, "texte-mots-exclusifs", "Mots utilisés uniquement par une personne (et est-ce un bon détecteur ?)",
+    "Ensemble des mots dits seulement par X dans le train ; on teste sur le test si une réplique contenant un de ces mots est bien de X.",
+    "mots exclusifs uniquement dit par une personne ensemble set difference detecter identifier auteur train test precision",
+    [["Découpage temporel train / test (les dernières saisons en test).",
+`script['mots'] = script['ligne'].str.lower().str.replace(r'[^\\w\\s]', ' ', regex=True).str.split()
+train = script[script['saison'] <= 2]
+test = script[script['saison'] > 2]
+mots_alice = set(train.loc[train['personnage'] == 'Alice', 'mots'].explode())
+mots_autres = set(train.loc[train['personnage'] != 'Alice', 'mots'].explode())
+exclusifs = mots_alice - mots_autres
+sorted(exclusifs)[:10]`],
+     ["Évaluer la règle « contient un mot exclusif → c'est Alice » sur le test.",
+`pred = test['mots'].apply(lambda m: len(exclusifs & set(m)) > 0)
+vrai = test['personnage'] == 'Alice'
+pd.Series({'accuracy': (pred == vrai).mean(),
+           'precision': (pred & vrai).sum() / max(pred.sum(), 1),
+           'recall': (pred & vrai).sum() / vrai.sum(),
+           'baseline (toujours « pas Alice »)': (~vrai).mean()})`]],
+    ["Toujours comparer à une baseline : prédire toujours la classe majoritaire donne déjà une bonne accuracy.",
+     "Peu de répliques contiennent un mot exclusif → rappel faible même si la précision est bonne."],
+    ["s.str", "df.explode", "s.apply"]);
+
+  R(C, "texte-classif-temporel", "Prédire l'auteur d'une phrase (TF-IDF + régression logistique)",
+    "Classifieur binaire « X ou pas X » avec un split temporel, comparé à la baseline, et les mots les plus révélateurs.",
+    "classifier auteur texte tfidf regression logistique logisticregressioncv train test temporel saison baseline mots caracteristiques",
+    [["", `from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegressionCV
+train = script[script['saison'] <= 2]
+test = script[script['saison'] > 2]
+vec = TfidfVectorizer()
+Xtr = vec.fit_transform(train['ligne'])        # fit sur le train seulement
+Xte = vec.transform(test['ligne'])
+ytr, yte = train['personnage'] == 'Alice', test['personnage'] == 'Alice'
+clf_txt = LogisticRegressionCV(Cs=10, cv=5, max_iter=1000).fit(Xtr, ytr)
+print('accuracy test :', clf_txt.score(Xte, yte), '| baseline :', (~yte).mean())
+mots = vec.get_feature_names_out()
+pd.Series(clf_txt.coef_[0], index=mots).sort_values().tail(8)   # mots qui « font » Alice`]],
+    ["Split temporel (dernières saisons en test) : plus réaliste qu'un split aléatoire.",
+     "Classes déséquilibrées : regarder précision / rappel, pas seulement l'accuracy."],
+    ["sklearn.feature_extraction.text.TfidfVectorizer", "sklearn.linear_model.LogisticRegressionCV", "vectorizer.get_feature_names_out"]);
+
+  R(C, "spacy-pipeline", "Pipeline NLP avec spaCy (phrases, tokens, lemmes, entités…)",
+    "Analyser un texte : découpage en phrases, catégories grammaticales, lemmes, mots vides, entités nommées, groupes nominaux.",
+    "spacy pipeline nlp phrases tokens tokenisation pos lemmes lemmatisation stop words entites nommees ner chunks",
+    [["Charger le modèle et analyser le texte.", `import spacy
+nlp = spacy.load('en_core_web_sm')
+doc = nlp(livre)
+[s.text for s in doc.sents][:2]`],
+     ["Tokens : catégorie grammaticale, lemme, mot vide.", `pd.DataFrame([(t.text, t.pos_, t.lemma_, t.is_stop) for t in doc[:12]],
+             columns=['token', 'pos', 'lemme', 'stop'])`],
+     ["Entités nommées et groupes nominaux.", `print([(e.text, e.label_) for e in doc.ents])
+[c.text for c in doc.noun_chunks][:6]`],
+     ["Mots les plus fréquents, sans mots vides ni ponctuation.", `from collections import Counter
+Counter(t.lemma_.lower() for t in doc if not t.is_stop and not t.is_punct).most_common(6)`]],
+    ["Beaucoup de textes : nlp.pipe(liste) est bien plus rapide qu'une boucle.",
+     "spacy.explain('GPE') pour comprendre une étiquette."],
+    ["spacy.load", "doc.sents", "token.pos_", "doc.ents", "doc.noun_chunks", "collections.Counter"]);
+
+  R(C, "sentiment", "Analyse de sentiment (VADER)",
+    "Score de sentiment par phrase ou par réplique, puis distribution et comparaison entre groupes.",
+    "sentiment analyse positif negatif neutre vader polarite emotion opinion compound distribution",
+    [["Sentiment d'une phrase.", `from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+analyzer = SentimentIntensityAnalyzer()
+analyzer.polarity_scores('The machine was never finished, what a terrible waste.')`],
+     ["Sur toutes les répliques : distribution et comparaison par personnage.",
+`script['compound'] = script['ligne'].apply(lambda l: analyzer.polarity_scores(l)['compound'])
+script['classe'] = pd.cut(script['compound'], [-1, -0.05, 0.05, 1], labels=['négatif', 'neutre', 'positif'], include_lowest=True)
+print(script['classe'].value_counts())
+sns.histplot(data=script, x='compound', bins=20)
+script.groupby('personnage')['compound'].mean().round(3)`]],
+    ["compound ≥ 0.05 : positif ; ≤ −0.05 : négatif ; sinon neutre.",
+     "VADER marche phrase par phrase : sur un long texte, découper en phrases (doc.sents) puis agréger."],
+    ["vaderSentiment.vaderSentiment.SentimentIntensityAnalyzer", "analyzer.polarity_scores", "pd.cut"]);
+
+  R(C, "topics-lda", "Trouver les thèmes d'un corpus (LDA)",
+    "Topic modeling : chaque document est un mélange de thèmes, chaque thème une distribution de mots.",
+    "lda topic modeling themes sujets corpus documents gensim latent dirichlet allocation",
+    [["Préparer : documents tokenisés → dictionnaire → sacs de mots.",
+`from gensim.corpora import Dictionary
+from gensim.models import LdaModel
+dictionary = Dictionary(corpus_docs)
+dictionary.filter_extremes(no_below=3, no_above=0.5)
+corpus_bow = [dictionary.doc2bow(d) for d in corpus_docs]
+len(dictionary), len(corpus_bow)`],
+     ["Entraîner et lire les thèmes.", `lda = LdaModel(corpus_bow, num_topics=3, id2word=dictionary, passes=10, random_state=0)
+for i, mots in lda.show_topics(num_words=5):
+    print(i, mots)`],
+     ["Thème principal de chaque document, comparé à la vraie catégorie.", `theme = [max(lda[b], key=lambda t: t[1])[0] for b in corpus_bow]
+pd.crosstab(df['sujet'], pd.Series(theme, name='theme LDA'))`]],
+    ["Retirer stop words et mots trop rares / fréquents avant (filter_extremes), sinon les thèmes sont pollués.",
+     "Le nombre de thèmes est un choix : en essayer plusieurs et lire les mots de chaque thème."],
+    ["gensim.corpora.Dictionary", "dictionary.filter_extremes", "dictionary.doc2bow", "gensim.models.LdaModel", "lda.show_topics", "pd.crosstab"]);
+
+  R(C, "empath", "Mesurer des catégories lexicales (Empath) et leur évolution",
+    "Proportion de mots liés à la joie, la douleur, l'argent… dans un texte, et comment elle évolue au fil du texte.",
+    "empath categories lexicales emotions joie douleur evolution texte semantique",
+    [["", `from empath import Empath
+lexicon = Empath()
+lexicon.analyze(livre, categories=['joy', 'pain', 'money', 'science'], normalize=True)`],
+     ["Évolution au fil du texte (par morceaux).", `morceaux = [' '.join(script['ligne'].iloc[i:i + 40]) for i in range(0, len(script), 40)]
+evol = pd.DataFrame([lexicon.analyze(m, categories=['positive_emotion', 'negative_emotion', 'science', 'work'], normalize=True)
+                     for m in morceaux])
+evol.plot(marker='o'); plt.xlabel('Morceau du texte'); plt.ylabel('Proportion de mots')`]],
+    ["normalize=True pour comparer des morceaux de tailles différentes."],
+    ["empath.Empath", "lexicon.analyze"]);
+
   // =========================================================================================
   C = "11 · Réseaux";
   R(C, "graphe", "Construire un graphe et calculer des mesures",

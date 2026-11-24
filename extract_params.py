@@ -36,6 +36,14 @@ import statsmodels.formula.api as smf  # noqa: E402
 from sklearn.ensemble import RandomForestClassifier  # noqa: E402
 from sklearn.linear_model import LogisticRegression  # noqa: E402
 from statsmodels.regression.linear_model import RegressionResults  # noqa: E402
+import collections  # noqa: E402
+import spacy.language  # noqa: E402
+import spacy.tokens  # noqa: E402
+from empath import Empath  # noqa: E402
+from gensim.corpora import Dictionary  # noqa: E402
+from gensim.models import LdaModel  # noqa: E402
+from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: E402
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer  # noqa: E402
 
 MAX_DESC = 900
 
@@ -43,7 +51,12 @@ ROOTS = {
     "pd": pd, "np": np, "plt": plt, "sns": sns, "stats": scipy.stats, "smf": smf, "sm": sm, "nx": nx,
     "df": pd.DataFrame, "s": pd.Series, "ax": matplotlib.axes.Axes, "res": RegressionResults,
     "model": LogisticRegression, "G": nx.Graph,
+    # texte
+    "doc": spacy.tokens.Doc, "token": spacy.tokens.Token, "nlp": spacy.language.Language,
+    "analyzer": SentimentIntensityAnalyzer, "dictionary": Dictionary, "lda": LdaModel, "lexicon": Empath,
+    "vectorizer": TfidfVectorizer, "Counter": collections.Counter,
 }
+FULL_ROOTS = ("sklearn", "statsmodels", "scipy", "spacy", "gensim", "nltk", "vaderSentiment", "empath", "collections", "string")
 # quelques méthodes « génériques » dont la meilleure doc est ailleurs
 OVERRIDE = {
     "model.feature_importances_": (RandomForestClassifier, "feature_importances_"),
@@ -64,7 +77,7 @@ def resolve(name):
             obj = getattr(obj, a)
         return obj
     parts = name.split(".")
-    if parts[0] in ("sklearn", "statsmodels", "scipy"):
+    if parts[0] in FULL_ROOTS:
         for i in range(len(parts) - 1, 0, -1):  # le plus long préfixe importable
             try:
                 obj = importlib.import_module(".".join(parts[:i]))
@@ -155,12 +168,13 @@ def describe(name):
         return None
     target = obj
     params = parse_params(inspect.getdoc(obj) or "")
-    if inspect.isclass(obj):  # ex. df.plot (accesseur) : la vraie liste est parfois dans __call__
-        cands = [params, parse_params(inspect.getdoc(getattr(obj, "__call__", None)) or "")]
+    if inspect.isclass(obj):  # ex. df.plot (accesseur) : la vraie liste est parfois dans __call__ ou __init__
+        cands = [params, parse_params(inspect.getdoc(getattr(obj, "__call__", None)) or ""),
+                 parse_params(inspect.getdoc(getattr(obj, "__init__", None)) or "")]
         if len(params) <= 1:  # pandas 3 : la doc de df.plot range x, y, kind... sous « Attributes »
             cands.append(parse_params(inspect.getdoc(obj) or "", ("Parameters", "Attributes")))
         params = max(cands, key=len)
-    defaults, sig = {}, None
+    defaults, sig, ps = {}, None, []
     try:
         s = inspect.signature(target)
         ps = [p for p in s.parameters.values() if p.name not in ("self", "cls")]
@@ -174,6 +188,13 @@ def describe(name):
         pass
     if not params and sig is None:
         return None
+    if not params and ps:  # doc pas au format numpydoc (spaCy, Empath…) : on liste au moins la signature réelle
+        params = []
+        for p in ps:
+            prefix = "*" if p.kind == p.VAR_POSITIONAL else "**" if p.kind == p.VAR_KEYWORD else ""
+            ann = "" if p.annotation is inspect.Parameter.empty else (
+                p.annotation if isinstance(p.annotation, str) else getattr(p.annotation, "__name__", str(p.annotation)))
+            params.append({"n": prefix + p.name, "t": re.sub(r"typing\.", "", str(ann))[:120], "x": ""})
     if sig and params and sig.count(",") + 1 < 0.5 * len(params):  # ex. df.plot : signature (data) trompeuse
         sig = None
     rows = []
@@ -207,7 +228,8 @@ def main():
     import statsmodels
     versions = {"pandas": pd.__version__, "numpy": np.__version__, "matplotlib": matplotlib.__version__,
                 "seaborn": sns.__version__, "scipy": scipy.__version__, "statsmodels": statsmodels.__version__,
-                "scikit-learn": sklearn.__version__, "networkx": nx.__version__}
+                "scikit-learn": sklearn.__version__, "networkx": nx.__version__,
+                "spacy": spacy.__version__, "gensim": __import__("gensim").__version__}
     result["_versions"] = versions
     js = "window.ADA_PARAMS = " + json.dumps(result, ensure_ascii=False, separators=(",", ":")) + ";\n"
     (TOOL / "params.js").write_text(js, encoding="utf-8")

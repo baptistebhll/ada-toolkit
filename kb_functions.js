@@ -620,4 +620,176 @@ G_max = G.subgraph(comps[0])`, "composantes connexes plus grande composante conn
   F(L, C, "nx.max_weight_matching", "nx.max_weight_matching(G, maxcardinality=False)", "Appariement de poids maximal (matching traité / contrôle).",
     `matching = nx.max_weight_matching(G)   # ensemble de paires (u, v)`, "matching appariement paires propensity score causal observationnel");
   F(L, C, "nx.draw", "nx.draw(G, pos=None, with_labels=False, node_size=300)", "Dessiner le graphe.", `nx.draw(G, pos=nx.spring_layout(G, seed=0), node_size=20)`, "dessiner visualiser graphe draw");
+
+  // ======================================================================================= TEXTE (NLP)
+  L = "nlp"; C = "Outils Python pour le texte";
+  F(L, C, "collections.Counter", "Counter(iterable)", "Compter les éléments d'une liste (ex. mots) ; .most_common(n) donne les plus fréquents.",
+    `from collections import Counter
+mots = ' '.join(script['ligne']).lower().split()
+compte = Counter(mots)
+compte.most_common(5)`, "compter mots frequence occurrences counter dictionnaire comptage most common");
+  F(L, C, "Counter.most_common", "compte.most_common(n)", "Les n éléments les plus fréquents d'un Counter, avec leur effectif.",
+    `from collections import Counter
+Counter(script['personnage']).most_common(3)`, "plus frequents top mots counter most common");
+  F(L, C, "string.punctuation", "string.punctuation", "Tous les signes de ponctuation ; avec str.maketrans pour les remplacer par des espaces.",
+    `import string
+table = str.maketrans(string.punctuation, ' ' * len(string.punctuation))
+script['ligne'].head(3).str.translate(table).str.lower()`, "ponctuation enlever nettoyer texte minuscules punctuation translate maketrans");
+  F(L, C, "np.argpartition", "np.argpartition(a, kth)", "Indices des k plus grandes / petites valeurs, sans tout trier (ex. mots aux plus gros coefficients).",
+    `top = np.argpartition(scores, -5)[-5:]   # indices des 5 plus grands scores (pas triés entre eux)
+scores[top]`, "top k plus grands indices argpartition coefficients mots");
+  F(L, C, "nltk.corpus.PlaintextCorpusReader", "PlaintextCorpusReader(dossier, motif_fichiers)", "Lire un dossier de fichiers texte comme un corpus (fileids, raw, words).",
+    `from nltk.corpus import PlaintextCorpusReader
+corpus = PlaintextCorpusReader('data/livres', r'.*\\.txt')
+corpus.fileids(), corpus.words('sport.txt')[:8]`, "corpus livres fichiers texte dossier nltk lire charger fileids words raw");
+  F(L, C, "sklearn.utils.shuffle", "shuffle(*arrays, random_state=None)", "Mélanger plusieurs tableaux en gardant les lignes alignées.",
+    `from sklearn.utils import shuffle
+X_m, y_m = shuffle(X, y, random_state=0)
+X_m.head(3)`, "melanger shuffle aleatoire ordre");
+
+  C = "spaCy (pipeline NLP)";
+  F(L, C, "spacy.load", "nlp = spacy.load('en_core_web_sm')", "Charger un modèle de langue spaCy ; nlp(texte) renvoie un Doc annoté (tokens, POS, entités…).",
+    `import spacy
+nlp = spacy.load('en_core_web_sm')
+doc = nlp(livre)
+len(doc), nlp.pipe_names`, "spacy nlp charger modele pipeline anglais en_core_web_sm traitement langage",
+    "À installer une fois : pip install spacy puis python -m spacy download en_core_web_sm. Pour aller plus vite : spacy.load(..., disable=['parser', 'ner']).");
+  F(L, C, "doc.sents", "doc.sents", "Découpage en phrases.",
+    `import spacy
+doc = spacy.load('en_core_web_sm')(livre)
+[s.text for s in doc.sents][:3]`, "phrases decouper sentence splitting segmentation sents");
+  F(L, C, "token.pos_", "token.text / .pos_ / .tag_ / .lemma_ / .is_stop / .is_punct", "Attributs de chaque token : mot, catégorie grammaticale, lemme, mot vide, ponctuation.",
+    `import spacy
+doc = spacy.load('en_core_web_sm')('She worked with Charles Babbage on his engine.')
+pd.DataFrame([(t.text, t.pos_, t.tag_, t.lemma_, t.is_stop) for t in doc],
+             columns=['texte', 'pos', 'tag', 'lemme', 'stop'])`, "tokens tokenisation pos part of speech categorie grammaticale nom verbe lemme lemmatisation stop words",
+    "spacy.explain('ADP') explique une étiquette.");
+  F(L, C, "token.lemma_", "token.lemma_", "Lemme (forme de base) : 'worked' → 'work', 'was' → 'be'.",
+    `import spacy
+doc = spacy.load('en_core_web_sm')(livre)
+[(t.text, t.lemma_) for t in doc if t.text != t.lemma_][:8]`, "lemme lemmatisation forme de base racine lemma");
+  F(L, C, "token.is_stop", "token.is_stop / token.is_punct", "Mot vide (the, a, of…) / ponctuation : pour les retirer avant de compter.",
+    `import spacy
+from collections import Counter
+doc = spacy.load('en_core_web_sm')(livre)
+Counter(t.lemma_.lower() for t in doc if not t.is_stop and not t.is_punct).most_common(5)`, "mots vides stop words stopwords retirer enlever ponctuation nettoyer compter");
+  F(L, C, "spacy.lang.en.stop_words.STOP_WORDS", "spacy.lang.en.stop_words.STOP_WORDS", "Ensemble des mots vides anglais de spaCy (modifiable).",
+    `from spacy.lang.en.stop_words import STOP_WORDS
+len(STOP_WORDS), sorted(STOP_WORDS)[:8]`, "stop words mots vides liste anglais");
+  F(L, C, "doc.ents", "doc.ents  (ent.text, ent.label_)", "Entités nommées : personnes, lieux, dates, organisations…",
+    `import spacy
+doc = spacy.load('en_core_web_sm')(livre)
+[(e.text, e.label_) for e in doc.ents]`, "entites nommees ner named entity recognition personnes lieux dates organisations");
+  F(L, C, "doc.noun_chunks", "doc.noun_chunks", "Groupes nominaux (« the first published algorithm »).",
+    `import spacy
+doc = spacy.load('en_core_web_sm')(livre)
+[c.text for c in doc.noun_chunks][:8]`, "groupes nominaux chunking noun chunks");
+  F(L, C, "spacy.explain", "spacy.explain(etiquette)", "Explication en clair d'une étiquette (POS, tag, entité).",
+    `import spacy
+spacy.explain('ADP'), spacy.explain('NNP'), spacy.explain('GPE')`, "expliquer etiquette pos tag label signification");
+  F(L, C, "nlp.pipe", "nlp.pipe(textes, batch_size=1000, n_process=1)", "Traiter beaucoup de textes d'un coup (bien plus rapide qu'une boucle de nlp()).",
+    `import spacy
+nlp = spacy.load('en_core_web_sm', disable=['parser', 'ner'])
+docs = list(nlp.pipe(script['ligne'].head(50)))
+[[t.lemma_ for t in d if not t.is_stop and not t.is_punct] for d in docs[:3]]`, "plusieurs textes rapide batch pipe traitement corpus");
+  F(L, C, "doc.vector", "doc.vector / token.vector", "Vecteur (embedding) d'un texte ou d'un mot ; doc1.similarity(doc2) compare deux textes.",
+    `import spacy
+nlp = spacy.load('en_core_web_sm')
+nlp('physics theory').similarity(nlp('quantum experiment')), nlp('cat').vector.shape`, "embedding vecteur word vectors similarite representation",
+    "en_core_web_sm n'a pas de vrais vecteurs de mots (similarité approximative) ; en_core_web_md / lg en ont.");
+
+  C = "Sentiment (VADER)";
+  F(L, C, "vaderSentiment.vaderSentiment.SentimentIntensityAnalyzer", "SentimentIntensityAnalyzer()", "Analyseur de sentiment VADER (règles + lexique), adapté aux textes courts.",
+    `from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+analyzer = SentimentIntensityAnalyzer()
+analyzer.polarity_scores('This machine is wonderful, I love it!')`, "sentiment analyse polarite positif negatif vader emotion opinion",
+    "compound ∈ [−1, 1] : ≥ 0.05 positif, ≤ −0.05 négatif, sinon neutre. neg + neu + pos = 1.");
+  F(L, C, "analyzer.polarity_scores", "analyzer.polarity_scores(texte)", "Scores neg / neu / pos / compound d'un texte.",
+    `from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+analyzer = SentimentIntensityAnalyzer()
+script['sentiment'] = script['ligne'].apply(lambda l: analyzer.polarity_scores(l)['compound'])
+script.groupby('personnage')['sentiment'].mean().round(3)`, "sentiment score compound polarite par phrase par personne");
+
+  C = "Thèmes (topic modeling)";
+  F(L, C, "gensim.corpora.Dictionary", "Dictionary(documents_tokenises)", "Vocabulaire mot ↔ identifiant pour gensim.",
+    `from gensim.corpora import Dictionary
+dictionary = Dictionary(corpus_docs)
+len(dictionary), list(dictionary.token2id.items())[:5]`, "dictionnaire vocabulaire gensim tokens identifiants topic");
+  F(L, C, "dictionary.filter_extremes", "dictionary.filter_extremes(no_below=5, no_above=0.5)", "Retirer les mots trop rares (< no_below docs) ou trop fréquents (> no_above en proportion).",
+    `from gensim.corpora import Dictionary
+dictionary = Dictionary(corpus_docs)
+dictionary.filter_extremes(no_below=3, no_above=0.5)
+len(dictionary)`, "filtrer mots rares frequents vocabulaire extremes");
+  F(L, C, "dictionary.doc2bow", "dictionary.doc2bow(document_tokenise)", "Sac de mots d'un document : liste de (id_mot, nombre).",
+    `from gensim.corpora import Dictionary
+dictionary = Dictionary(corpus_docs)
+corpus_bow = [dictionary.doc2bow(d) for d in corpus_docs]
+corpus_bow[0]`, "sac de mots bag of words bow document vecteur gensim");
+  F(L, C, "gensim.models.LdaModel", "LdaModel(corpus, num_topics, id2word, passes=1, random_state=None)", "Topic modeling LDA : trouve num_topics thèmes (distributions de mots).",
+    `from gensim.corpora import Dictionary
+from gensim.models import LdaModel
+dictionary = Dictionary(corpus_docs)
+corpus_bow = [dictionary.doc2bow(d) for d in corpus_docs]
+lda = LdaModel(corpus_bow, num_topics=3, id2word=dictionary, passes=10, random_state=0)
+lda.show_topics(num_words=5)`, "lda topic modeling themes sujets latent dirichlet allocation gensim",
+    "LdaMulticore = même chose en parallèle (paramètre workers). Le nombre de thèmes se choisit : essayer plusieurs valeurs et lire les mots de chaque thème.");
+  F(L, C, "gensim.models.LdaMulticore", "LdaMulticore(corpus, num_topics, id2word, passes=1, workers=None, random_state=None)", "LDA parallélisé (plusieurs cœurs) ; même utilisation que LdaModel.",
+    `from gensim.models import LdaMulticore   # utilisation : comme LdaModel, avec workers=...`, "lda topic modeling parallele multicore");
+  F(L, C, "lda.show_topics", "lda.show_topics(num_topics=10, num_words=10) / lda.show_topic(i, topn)", "Mots les plus probables de chaque thème.",
+    `from gensim.corpora import Dictionary
+from gensim.models import LdaModel
+dictionary = Dictionary(corpus_docs)
+corpus_bow = [dictionary.doc2bow(d) for d in corpus_docs]
+lda = LdaModel(corpus_bow, num_topics=3, id2word=dictionary, passes=10, random_state=0)
+lda.show_topic(0, 6)`, "mots du theme topics afficher");
+  F(L, C, "gensim.models.phrases.Phrases", "Phrases(documents, min_count=5, threshold=10)", "Détecter les expressions de 2 mots fréquentes (bigrammes, ex. 'new_york').",
+    `from gensim.models.phrases import Phrases
+bigram = Phrases(corpus_docs, min_count=3, threshold=1)
+[w for w in bigram[corpus_docs[0]] if '_' in w]`, "bigrammes expressions phrases ngram deux mots");
+  F(L, C, "sklearn.decomposition.LatentDirichletAllocation", "LatentDirichletAllocation(n_components=10, random_state=None)", "LDA version scikit-learn (sur un CountVectorizer).",
+    `from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+cv = CountVectorizer()
+Xc = cv.fit_transform(df['texte'])
+lda_sk = LatentDirichletAllocation(n_components=3, random_state=0).fit(Xc)
+mots = cv.get_feature_names_out()
+[[mots[i] for i in comp.argsort()[-5:]] for comp in lda_sk.components_]`, "lda topic modeling themes sklearn latent dirichlet");
+
+  C = "Catégories lexicales (Empath)";
+  F(L, C, "empath.Empath", "lexicon = Empath()", "Lexique de ~200 catégories (joy, pain, health…) pour mesurer des thèmes dans un texte.",
+    `from empath import Empath
+lexicon = Empath()
+list(lexicon.cats.keys())[:10], lexicon.cats['health'][:8]`, "empath lexique categories emotions themes semantique");
+  F(L, C, "lexicon.analyze", "lexicon.analyze(texte, categories=None, normalize=False)", "Compte les mots de chaque catégorie dans un texte (normalize=True : proportion).",
+    `from empath import Empath
+lexicon = Empath()
+lexicon.analyze(livre, categories=['joy', 'pain', 'money', 'science'], normalize=True)`, "empath analyser categories emotions compter normaliser");
+  F(L, C, "lexicon.create_category", "lexicon.create_category(nom, mots_graines, model='fiction')", "Créer une catégorie à partir de mots « graines » (model : 'fiction', 'nytimes', 'reddit').",
+    `# Nécessite internet (le serveur d'Empath génère la catégorie) :
+# lexicon.create_category('healthy_food', ['healthy_food', 'low_carb', 'kale', 'avocado'], model='nytimes')`, "empath creer categorie personnalisee mots graines");
+
+  C = "scikit-learn pour le texte";
+  F(L, C, "vectorizer.get_feature_names_out", "vectorizer.get_feature_names_out()", "Les mots correspondant aux colonnes d'un CountVectorizer / TfidfVectorizer.",
+    `from sklearn.feature_extraction.text import CountVectorizer
+cv = CountVectorizer(stop_words='english')
+cv.fit(script['ligne'])
+cv.get_feature_names_out()[:10]`, "mots colonnes vocabulaire feature names vectorizer",
+    "Les vieux notebooks écrivent get_feature_names() : supprimé depuis scikit-learn 1.2 → utiliser get_feature_names_out().");
+  F(L, C, "vectorizer.get_feature_names", "vectorizer.get_feature_names()  (ancien nom)", "Ancien nom de get_feature_names_out (scikit-learn < 1.2).",
+    `from sklearn.feature_extraction.text import CountVectorizer
+CountVectorizer().fit(['un petit exemple']).get_feature_names_out()   # nom actuel`, "ancien get feature names erreur attributeerror");
+  F(L, C, "sklearn.linear_model.LogisticRegressionCV", "LogisticRegressionCV(Cs=10, cv=None, max_iter=100)", "Régression logistique qui choisit elle-même C (régularisation) par validation croisée.",
+    `from sklearn.linear_model import LogisticRegressionCV
+from sklearn.feature_extraction.text import TfidfVectorizer
+Xt = TfidfVectorizer().fit_transform(script['ligne'])
+yt = (script['personnage'] == 'Alice').astype(int)
+clf_cv = LogisticRegressionCV(Cs=10, cv=5, max_iter=1000).fit(Xt, yt)
+clf_cv.C_, clf_cv.score(Xt, yt)`, "regression logistique validation croisee choisir c regularisation automatique",
+    "Évaluer ensuite sur un jeu de test à part (score sur le train = trop optimiste).");
+  F(L, C, "sklearn.decomposition.TruncatedSVD", "TruncatedSVD(n_components=2, random_state=None)", "Réduction de dimension pour matrices creuses (TF-IDF) : « LSA ».",
+    `from sklearn.decomposition import TruncatedSVD
+from sklearn.feature_extraction.text import TfidfVectorizer
+Xt = TfidfVectorizer().fit_transform(df['texte'])
+X2 = TruncatedSVD(n_components=2, random_state=0).fit_transform(Xt)
+plt.scatter(X2[:, 0], X2[:, 1], c=df['sujet'].astype('category').cat.codes, s=10)`, "svd lsa reduction dimension tfidf creux sparse visualiser textes");
 })();

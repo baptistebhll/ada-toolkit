@@ -18,7 +18,7 @@
   }
 
   // ================================================================== constantes
-  const LIB_ORDER = ["pandas", "numpy", "matplotlib", "seaborn", "scipy", "statsmodels", "scikit-learn", "networkx", "math", "autres", "méthodes"];
+  const LIB_ORDER = ["pandas", "numpy", "matplotlib", "seaborn", "scipy", "statsmodels", "scikit-learn", "networkx", "nlp", "math", "autres", "méthodes"];
   const LIB_INFO = {
     pandas: { c: "#7c5cff", d: "Tableaux de données : lire, nettoyer, filtrer, grouper, joindre.", imp: "import pandas as pd" },
     numpy: { c: "#3fa7d6", d: "Calcul numérique, tableaux, tirages aléatoires.", imp: "import numpy as np" },
@@ -28,6 +28,8 @@
     statsmodels: { c: "#b0457d", d: "Régressions avec formules et résultats détaillés (p-values, IC).", imp: "import statsmodels.formula.api as smf\nimport statsmodels.api as sm" },
     "scikit-learn": { c: "#e0a100", d: "Machine learning : modèles, validation croisée, métriques, clustering, texte.", imp: "from sklearn.<module> import <Classe>" },
     networkx: { c: "#3c9a50", d: "Graphes et réseaux : construction, centralités, communautés, matching.", imp: "import networkx as nx" },
+    nlp: { c: "#d4583a", label: "Texte (NLP)", d: "spaCy (phrases, tokens, lemmes, entités), sentiment VADER, thèmes LDA (gensim), Empath, comptage de mots.",
+      imp: "import spacy\nnlp = spacy.load('en_core_web_sm')\nfrom vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer\nfrom gensim.corpora import Dictionary\nfrom gensim.models import LdaModel\nfrom empath import Empath\nfrom collections import Counter" },
     math: { c: "#8a8f98", d: "Fonctions mathématiques de base.", imp: "import math" },
     autres: { c: "#8a8f98", label: "Autres librairies", d: "Autres librairies rencontrées dans les séries." },
     "méthodes": { c: "#8a8f98", label: "Autres méthodes", d: "Méthodes et attributs vus dans les séries, sans fiche détaillée." },
@@ -75,14 +77,28 @@
   };
 
   // ================================================================== données : fonctions
+  // noms complets de modules : la clé reste le nom complet (comme dans l'index des notebooks)
+  const FULL_ROOT = /^(sklearn|statsmodels|scipy|spacy|gensim|nltk|vaderSentiment|empath|collections|string)\./;
+  const SHORT_DISPLAY = /^(sklearn|statsmodels|scipy|gensim|nltk|vaderSentiment|empath|collections)\./;
   function kbKey(name) {
-    if (/^(sklearn|statsmodels|scipy)\./.test(name)) return name;
+    if (FULL_ROOT.test(name)) return name;
     const parts = name.split(".");
     if (ALIAS[parts[0]]) return ALIAS[parts[0]] + "." + parts.slice(1).join(".");
     if (parts.length > 1) return "." + parts[parts.length - 1];
     return name;
   }
-  const kbDisplay = (name) => (/^(sklearn|statsmodels|scipy)\./.test(name) ? name.split(".").pop() : name);
+  const kbDisplay = (name) => (SHORT_DISPLAY.test(name) ? name.split(".").pop() : name);
+  /** documentation des librairies texte (pas de page par fonction partout) */
+  function nlpDoc(name) {
+    if (/^(spacy|doc|token|nlp)\./.test(name)) return "https://spacy.io/usage/linguistic-features";
+    if (/^(gensim|dictionary|lda)\./.test(name)) return "https://radimrehurek.com/gensim/apiref.html";
+    if (/^(vaderSentiment|analyzer)\./.test(name)) return "https://github.com/cjhutto/vaderSentiment";
+    if (/^(empath|lexicon)\./.test(name)) return "https://github.com/Ejhfast/empath-client";
+    if (/^nltk\./.test(name)) return "https://www.nltk.org/howto/corpus.html";
+    if (/^(collections|Counter)\./.test(name)) return "https://docs.python.org/3/library/collections.html#collections.Counter";
+    if (/^string\./.test(name)) return "https://docs.python.org/3/library/string.html";
+    return null;
+  }
 
   function docUrl(key, lib, short) {
     if (key.startsWith(".")) {
@@ -113,6 +129,7 @@
     const key = kbKey(k.name);
     const f = FN[key] || (FN[key] = { key, cells: [], count: 0, short: key.split(".").pop() });
     Object.assign(f, { display: kbDisplay(k.name), lib: k.lib, cat: k.cat, sig: k.sig, desc: k.d, ex: k.ex, tags: k.t || "", note: k.n || "", kb: true, kbIdx: idx, exOut: (EX.fn || {})[k.name] || [], params: PARAMS[k.name] || null });
+    if (k.lib === "nlp") f.doc = nlpDoc(k.name) || f.doc;
     if (!f.doc) f.doc = docUrl(key, f.lib, f.short);
   });
   // ordre : fiches dans l'ordre du fichier kb_functions.js, puis les fonctions vues seulement en série
@@ -360,7 +377,7 @@
   function viewHome() {
     const libs = LIB_ORDER.filter((l) => LIB_INFO[l] && !["math", "autres", "méthodes"].includes(l)).map((lib) => {
       const n = FNS.filter((f) => f.lib === lib && f.kb).length;
-      return `<a class="libcard" href="${libHref(lib)}"><h3><span class="lib-dot" style="--c:${libColor(lib)}"></span>${esc(lib)}<span class="cnt">${n}</span></h3>
+      return `<a class="libcard" href="${libHref(lib)}"><h3><span class="lib-dot" style="--c:${libColor(lib)}"></span>${esc(libLabel(lib))}<span class="cnt">${n}</span></h3>
         <p>${esc(LIB_INFO[lib].d)}</p></a>`;
     }).join("");
     const pipeline = RCATS.map((cat) => `<div class="stage"><h3>${esc(cat)}</h3>
@@ -505,7 +522,8 @@
     }).join("");
     return `<section class="rgroup params-sec" id="params-sec"><h2 class="sec">Tous les paramètres <span class="cnt">${P.params.length}</span></h2>
       <p class="data-note">Ce qu'on peut mettre entre les parenthèses de <code>${esc(f.display)}(…)</code> : valeurs possibles, défaut (<code>= …</code>), description.
-        Tiré de la doc officielle de <code>${esc(P.src)}</code>${version ? ` (version${esc(version)})` : ""}, en anglais — clique une ligne pour la description complète.</p>
+        Tiré de la doc officielle de <code>${esc(P.src)}</code>${version ? ` (version${esc(version)})` : ""}, en anglais — clique une ligne pour la description complète.
+        ${P.params.every((p) => !p.x) ? "Pour cette librairie, seule la signature réelle (noms et défauts) est disponible : voir le lien « Documentation officielle » pour le détail." : ""}</p>
       ${P.sig ? `<details class="fullsig"><summary>Signature complète</summary><pre class="code sig"><code>${highlight(f.display + P.sig)}</code></pre></details>` : ""}
       <div class="params">${rows}</div>
       ${P.params.length > shown ? `<button class="more">Voir les ${P.params.length - shown} autres paramètres</button>` : ""}</section>`;
